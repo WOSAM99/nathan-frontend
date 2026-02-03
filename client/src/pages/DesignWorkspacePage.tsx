@@ -1,17 +1,41 @@
+import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { ComparisonView } from "@/components/ComparisonView";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, ArrowLeft } from "lucide-react";
+import { ChevronRight, ArrowLeft, X } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 // Mock Images
 import baselineImg from "@/assets/images/room-baseline.jpg";
 import kitchenImg from "@/assets/images/kitchen-modern_1.jpg";
 import kitchenImg2 from "@/assets/images/kitchen-modern_2.jpg";
 import livingImg from "@/assets/images/living-room-luxury_1.jpg";
+import comp1 from "@/assets/images/comp-highland_1.jpg";
+import comp2 from "@/assets/images/comp-highland_2.jpg";
+import comp3 from "@/assets/images/comp-highland_3.jpg";
+import comp4 from "@/assets/images/comp-highland_4.jpg";
 
 export default function DesignWorkspacePage() {
+  const [activeComp, setActiveComp] = useState<string | null>(null);
+
+  const marketComps = [
+      {
+          id: "highland",
+          title: "Highland Residence • Modern Transitional",
+          match: "92%",
+          assets: [comp1, comp2, comp3, comp4]
+      }
+  ];
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col">
       {/* Studio Header */}
@@ -104,13 +128,50 @@ export default function DesignWorkspacePage() {
                      <span className="text-[10px] font-bold text-accent cursor-pointer hover:underline">GLOBAL SEARCH</span>
                   </div>
                   
-                  <div className="bg-white border border-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                     <div>
-                        <h4 className="text-sm font-medium text-primary">Highland Residence • Modern Transitional</h4>
-                        <p className="text-xs text-muted-foreground mt-1">Matched 92% similarity to subject property layout.</p>
-                     </div>
-                     <Badge variant="secondary" className="bg-secondary text-primary border-none">12 ASSETS</Badge>
-                  </div>
+                  {marketComps.map((comp) => (
+                    <Sheet key={comp.id}>
+                        <SheetTrigger asChild>
+                            <div className="bg-white border border-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+                                <div>
+                                    <h4 className="text-sm font-medium text-primary group-hover:text-accent transition-colors">{comp.title}</h4>
+                                    <p className="text-xs text-muted-foreground mt-1">Matched {comp.match} similarity to subject property layout.</p>
+                                </div>
+                                <Badge variant="secondary" className="bg-secondary text-primary border-none group-hover:bg-primary group-hover:text-white transition-colors">
+                                    {comp.assets.length} ASSETS
+                                </Badge>
+                            </div>
+                        </SheetTrigger>
+                        <SheetContent side="bottom" className="h-[80vh] rounded-t-3xl border-t border-border shadow-2xl p-0">
+                            <div className="h-full flex flex-col">
+                                <div className="p-8 border-b border-border flex items-center justify-between bg-white rounded-t-3xl sticky top-0 z-10">
+                                    <div>
+                                        <h2 className="text-xl font-light text-primary">{comp.title}</h2>
+                                        <p className="text-sm text-muted-foreground mt-1">Visual Reference Library • {comp.match} Match</p>
+                                    </div>
+                                    <Button variant="outline" className="rounded-full border-border">
+                                        Use as Reference
+                                    </Button>
+                                </div>
+                                <div className="flex-1 overflow-auto p-8 bg-[#f8f9fa]">
+                                    <div className="grid grid-cols-4 gap-6">
+                                        {comp.assets.map((img, i) => (
+                                            <div key={i} className="group cursor-pointer">
+                                                <div className="aspect-[4/3] rounded-xl overflow-hidden shadow-sm relative mb-3 group-hover:shadow-lg transition-all duration-300">
+                                                    <img src={img} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                                    <Button size="sm" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 rounded-full bg-white text-primary hover:bg-white/90 shadow-lg text-xs font-bold uppercase tracking-wider scale-90 group-hover:scale-100 transition-all">
+                                                        Apply Style
+                                                    </Button>
+                                                </div>
+                                                <p className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Reference View 0{i+1}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                  ))}
                </div>
             </div>
 
