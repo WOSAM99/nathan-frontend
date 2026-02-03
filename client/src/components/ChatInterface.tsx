@@ -68,9 +68,6 @@ export function ChatInterface() {
              <Button variant="outline" size="sm" className="bg-white/90 backdrop-blur text-xs rounded-full h-7 border-border shadow-sm text-muted-foreground hover:text-primary">
                 "Change countertop to marble"
              </Button>
-             <Button variant="outline" size="sm" className="bg-white/90 backdrop-blur text-xs rounded-full h-7 border-border shadow-sm text-muted-foreground hover:text-primary">
-                "Adjust lighting intensity"
-             </Button>
           </div>
           
           <div className="flex gap-2">
