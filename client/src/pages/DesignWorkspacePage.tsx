@@ -99,6 +99,35 @@ export default function DesignWorkspacePage() {
     toast.success(`Generated ${iteration.version}`);
   };
 
+  const mockIterations = [
+    { id: 'v2.3', label: 'Polished Marble Edit', img: kitchenImg, timestamp: '2 hours ago', fullTime: 'Feb 3, 2026 at 10:24 AM' },
+    { id: 'v2.2', label: 'Walnut Cabinetry', img: kitchenImg2, timestamp: 'Yesterday', fullTime: 'Feb 2, 2026 at 3:45 PM' },
+    { id: 'v2.1', label: 'Recessed Lighting', img: livingImg, timestamp: '2 days ago', fullTime: 'Feb 1, 2026 at 11:30 AM' },
+    { id: 'v1.5', label: 'Open Floor Conc', img: baselineImg, timestamp: 'Jan 30', fullTime: 'Jan 30, 2026 at 9:15 AM' },
+  ];
+
+  const displayIterations = propertyDetails?.iterations?.length 
+    ? propertyDetails.iterations.map(it => ({
+        id: it.version,
+        label: it.label || `Iteration ${it.version}`,
+        img: it.image_url,
+        timestamp: new Date(it.created_at).toLocaleDateString(),
+        fullTime: new Date(it.created_at).toLocaleString(),
+      }))
+    : mockIterations;
+
+  const displayImages = propertyDetails?.images?.length
+    ? propertyDetails.images.filter(img => 
+        !activeRoom.id || img.room_id === activeRoom.id
+      ).map(img => ({
+        id: img.id,
+        url: img.url,
+        category: img.category,
+      }))
+    : null;
+
+  const hasValidRoom = propertyDetails?.rooms && propertyDetails.rooms.length > 0;
+
   const toggleIterationSelection = (id: string) => {
     setSelectedIterations(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -423,12 +452,7 @@ export default function DesignWorkspacePage() {
                   </div>
                   
                   <div className="grid grid-cols-4 gap-4">
-                     {[
-                        { id: 'v2.3', label: 'Polished Marble Edit', img: kitchenImg, timestamp: '2 hours ago', fullTime: 'Feb 3, 2026 at 10:24 AM' },
-                        { id: 'v2.2', label: 'Walnut Cabinetry', img: kitchenImg2, timestamp: 'Yesterday', fullTime: 'Feb 2, 2026 at 3:45 PM' },
-                        { id: 'v2.1', label: 'Recessed Lighting', img: livingImg, timestamp: '2 days ago', fullTime: 'Feb 1, 2026 at 11:30 AM' },
-                        { id: 'v1.5', label: 'Open Floor Conc', img: baselineImg, timestamp: 'Jan 30', fullTime: 'Jan 30, 2026 at 9:15 AM' },
-                     ].map((item) => {
+                     {displayIterations.map((item) => {
                         const isSelected = selectedIterations.includes(item.id);
                         const isCurrent = currentVersion === item.id;
                         return (
@@ -616,7 +640,7 @@ export default function DesignWorkspacePage() {
             <div className="w-[400px] h-full flex-shrink-0">
                <ChatInterface 
                  propertyId={propertyId}
-                 roomId={activeRoom.id}
+                 roomId={hasValidRoom ? activeRoom.id : undefined}
                  referenceImages={selectedReferences}
                  onIterationGenerated={handleIterationGenerated}
                />

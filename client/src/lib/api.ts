@@ -204,10 +204,15 @@ class ApiClient {
     return this.request<PropertyDetails>(`/doc/${propertyId}`);
   }
 
-  async uploadDocument(propertyId: string, files: File[]): Promise<{ success: boolean; message: string }> {
+  async uploadDocument(propertyId: string, files: File[], notes?: string): Promise<{ success: boolean; message: string; property_id: string }> {
     const formData = new FormData();
-    formData.append('property_id', propertyId);
+    if (propertyId && propertyId !== 'new') {
+      formData.append('property_id', propertyId);
+    }
     files.forEach(file => formData.append('files', file));
+    if (notes) {
+      formData.append('notes', notes);
+    }
 
     const response = await fetch(`${API_BASE_URL}/doc/upload`, {
       method: 'POST',

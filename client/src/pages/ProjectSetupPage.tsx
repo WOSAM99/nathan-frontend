@@ -41,9 +41,13 @@ export default function ProjectSetupPage() {
     
     try {
       const allFiles = [...mlsFiles, ...compFiles];
-      const result = await api.uploadDocument("new", allFiles);
+      const result = await api.uploadDocument("new", allFiles, notes);
       toast.success("Project initialized successfully");
-      setLocation("/organize");
+      if (result.property_id) {
+        setLocation(`/organize/${result.property_id}`);
+      } else {
+        setLocation("/organize");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
