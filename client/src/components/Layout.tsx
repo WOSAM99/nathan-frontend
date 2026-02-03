@@ -30,7 +30,6 @@ export function Layout({ children, title, actions }: LayoutProps) {
   const navItems = [
     { icon: LayoutDashboard, label: "Projects", href: "/dashboard" },
     { icon: Palette, label: "Studio", href: "/studio/123" }, // Mock ID
-    { icon: Images, label: "Assets", href: "/organize" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
