@@ -6,7 +6,7 @@ import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock, Undo2, Redo2, Star, Download, Trash2, GitCompare } from "lucide-react";
+import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock, Undo2, Redo2, Download, Trash2, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -36,20 +36,11 @@ export default function DesignWorkspacePage() {
   const [selectedReferences, setSelectedReferences] = useState<string[]>([]);
   const [activeRoom, setActiveRoom] = useState(roomCategories[0]);
   const [roomMenuOpen, setRoomMenuOpen] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>(['v2.3']);
   const [selectedIterations, setSelectedIterations] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<string[]>(['v2.3', 'v2.2', 'v2.1']);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [currentVersion, setCurrentVersion] = useState('v2.3');
   const menuRef = useRef<HTMLDivElement>(null);
-
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => {
-      const newFavorites = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id];
-      toast.success(prev.includes(id) ? 'Removed from favorites' : 'Added to favorites');
-      return newFavorites;
-    });
-  };
 
   const toggleIterationSelection = (id: string) => {
     setSelectedIterations(prev => 
@@ -381,7 +372,6 @@ export default function DesignWorkspacePage() {
                         { id: 'v2.1', label: 'Recessed Lighting', img: livingImg, timestamp: '2 days ago', fullTime: 'Feb 1, 2026 at 11:30 AM' },
                         { id: 'v1.5', label: 'Open Floor Conc', img: baselineImg, timestamp: 'Jan 30', fullTime: 'Jan 30, 2026 at 9:15 AM' },
                      ].map((item) => {
-                        const isFavorite = favorites.includes(item.id);
                         const isSelected = selectedIterations.includes(item.id);
                         const isCurrent = currentVersion === item.id;
                         return (
@@ -432,28 +422,8 @@ export default function DesignWorkspacePage() {
                                           )}
                                        </div>
 
-                                       {/* Action Buttons (top right) */}
-                                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <Tooltip>
-                                             <TooltipTrigger asChild>
-                                                <button
-                                                   className={cn(
-                                                      "w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-sm",
-                                                      isFavorite 
-                                                         ? "bg-amber-400 text-white" 
-                                                         : "bg-white/90 backdrop-blur text-muted-foreground hover:text-amber-500"
-                                                   )}
-                                                   onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      toggleFavorite(item.id);
-                                                   }}
-                                                   aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                                                >
-                                                   <Star className={cn("w-3 h-3", isFavorite && "fill-current")} />
-                                                </button>
-                                             </TooltipTrigger>
-                                             <TooltipContent>{isFavorite ? "Remove from favorites" : "Add to favorites"}</TooltipContent>
-                                          </Tooltip>
+                                       {/* Action Button (top right) */}
+                                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                           <Tooltip>
                                              <TooltipTrigger asChild>
                                                 <button
@@ -477,12 +447,6 @@ export default function DesignWorkspacePage() {
                                           {item.timestamp}
                                        </div>
 
-                                       {/* Favorite indicator when not hovering */}
-                                       {isFavorite && (
-                                          <div className="absolute top-2 right-2 group-hover:opacity-0 transition-opacity">
-                                             <Star className="w-4 h-4 text-amber-400 fill-amber-400 drop-shadow" />
-                                          </div>
-                                       )}
                                     </div>
                                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate group-hover:text-primary transition-colors">{item.label}</p>
                                  </div>
