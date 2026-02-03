@@ -4,6 +4,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, Sparkles, Paperclip, Mic, MicOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 interface SpeechRecognitionResult {
   readonly isFinal: boolean;
@@ -105,7 +107,14 @@ function EmptyState() {
   );
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  propertyId?: string;
+  roomId?: string;
+  referenceImages?: string[];
+  onIterationGenerated?: (iteration: { id: string; image_url: string; version: string }) => void;
+}
+
+export function ChatInterface({ propertyId, roomId, referenceImages = [], onIterationGenerated }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -176,21 +185,20 @@ export function ChatInterface() {
     }
   ]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!inputValue.trim()) return;
     
-    // Add user message
     const userMessage = {
       id: messages.length + 1,
       role: "user" as const,
       content: inputValue
     };
     setMessages(prev => [...prev, userMessage]);
+    const prompt = inputValue;
     setInputValue("");
     setIsTyping(true);
     setGenerationProgress(0);
     
-    // Animate progress bar
     let progress = 0;
     progressIntervalRef.current = setInterval(() => {
       progress += Math.random() * 15 + 5;
@@ -203,29 +211,79 @@ export function ChatInterface() {
       setGenerationProgress(Math.min(Math.round(progress), 95));
     }, 300);
     
-    // Simulate AI response after delay
-    setTimeout(() => {
+    try {
+      if (propertyId && roomId) {
+        const result = await api.regenerateDesign({
+          property_id: propertyId,
+          room_id: roomId,
+          prompt: prompt,
+          reference_images: referenceImages,
+        });
+        
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+        setGenerationProgress(100);
+        
+        setTimeout(() => {
+          setIsTyping(false);
+          setGenerationProgress(0);
+          
+          const aiMessage = {
+            id: messages.length + 2,
+            role: "assistant" as const,
+            content: `I've generated a new design iteration (${result.version}). The updated render reflects your feedback.`,
+            image: result.image_url
+          };
+          setMessages(prev => [...prev, aiMessage]);
+          
+          if (onIterationGenerated) {
+            onIterationGenerated({
+              id: result.iteration_id,
+              image_url: result.image_url,
+              version: result.version,
+            });
+          }
+        }, 300);
+      } else {
+        setTimeout(() => {
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+          }
+          setGenerationProgress(100);
+          
+          setTimeout(() => {
+            setIsTyping(false);
+            setGenerationProgress(0);
+            const aiResponses = [
+              "I've processed your request and generated a new iteration. The updated design incorporates your feedback while maintaining the overall aesthetic.",
+              "Understood! I'm applying those changes now. The new render shows improved spatial flow based on your direction.",
+              "Great choice! I've updated the design to reflect your preferences. Take a look at the comparison view to see the changes."
+            ];
+            const aiMessage = {
+              id: messages.length + 2,
+              role: "assistant" as const,
+              content: aiResponses[Math.floor(Math.random() * aiResponses.length)]
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          }, 300);
+        }, 3000);
+      }
+    } catch (error) {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
-      setGenerationProgress(100);
+      setIsTyping(false);
+      setGenerationProgress(0);
+      toast.error(error instanceof Error ? error.message : "Failed to generate design");
       
-      setTimeout(() => {
-        setIsTyping(false);
-        setGenerationProgress(0);
-        const aiResponses = [
-          "I've processed your request and generated a new iteration. The updated design incorporates your feedback while maintaining the overall aesthetic.",
-          "Understood! I'm applying those changes now. The new render shows improved spatial flow based on your direction.",
-          "Great choice! I've updated the design to reflect your preferences. Take a look at the comparison view to see the changes."
-        ];
-        const aiMessage = {
-          id: messages.length + 2,
-          role: "assistant" as const,
-          content: aiResponses[Math.floor(Math.random() * aiResponses.length)]
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      }, 300);
-    }, 3000);
+      const errorMessage = {
+        id: messages.length + 2,
+        role: "assistant" as const,
+        content: "I apologize, but I encountered an error generating the design. Please try again."
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

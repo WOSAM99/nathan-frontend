@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { Layout } from "@/components/Layout";
 import { ComparisonView } from "@/components/ComparisonView";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock, Undo2, Redo2, Download, Trash2, GitCompare } from "lucide-react";
+import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock, Undo2, Redo2, Download, Trash2, GitCompare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { api, PropertyDetails, Room } from "@/lib/api";
 
-// Mock Images
 import baselineImg from "@/assets/images/room-baseline.jpg";
 import kitchenImg from "@/assets/images/kitchen-modern_1.jpg";
 import kitchenImg2 from "@/assets/images/kitchen-modern_2.jpg";
@@ -20,7 +20,7 @@ import comp2 from "@/assets/images/comp-highland_2.jpg";
 import comp3 from "@/assets/images/comp-highland_3.jpg";
 import comp4 from "@/assets/images/comp-highland_4.jpg";
 
-const roomCategories = [
+const defaultRoomCategories = [
   { id: 'kitchen', label: 'Kitchen', icon: Utensils, count: 4 },
   { id: 'living', label: 'Living Room', icon: Sofa, count: 3 },
   { id: 'bedroom', label: 'Master Bedroom', icon: Bed, count: 2 },
@@ -30,17 +30,74 @@ const roomCategories = [
   { id: 'entry', label: 'Entry/Foyer', icon: Home, count: 1 },
 ];
 
+const getRoomIcon = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'kitchen': return Utensils;
+    case 'living': case 'living room': return Sofa;
+    case 'bedroom': case 'master bedroom': return Bed;
+    case 'bathroom': case 'bath': return Bath;
+    case 'exterior': case 'outdoor': return Trees;
+    case 'garage': return Car;
+    case 'entry': case 'foyer': return Home;
+    default: return Building;
+  }
+};
+
 export default function DesignWorkspacePage() {
+  const [, params] = useRoute('/studio/:id');
+  const propertyId = params?.id;
   const [, setLocation] = useLocation();
+  const [propertyDetails, setPropertyDetails] = useState<PropertyDetails | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeComp, setActiveComp] = useState<string | null>(null);
   const [selectedReferences, setSelectedReferences] = useState<string[]>([]);
-  const [activeRoom, setActiveRoom] = useState(roomCategories[0]);
+  const [roomCategories, setRoomCategories] = useState(defaultRoomCategories);
+  const [activeRoom, setActiveRoom] = useState(defaultRoomCategories[0]);
   const [roomMenuOpen, setRoomMenuOpen] = useState(false);
   const [selectedIterations, setSelectedIterations] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<string[]>(['v2.3', 'v2.2', 'v2.1']);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [currentVersion, setCurrentVersion] = useState('v2.3');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const loadPropertyDetails = async () => {
+      if (!propertyId) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const details = await api.getPropertyDetails(propertyId);
+        setPropertyDetails(details);
+        
+        if (details.rooms && details.rooms.length > 0) {
+          const apiRooms = details.rooms.map(room => ({
+            id: room.id,
+            label: room.name,
+            icon: getRoomIcon(room.type),
+            count: room.image_count,
+          }));
+          setRoomCategories(apiRooms);
+          setActiveRoom(apiRooms[0]);
+        }
+      } catch (error) {
+        console.error('Failed to load property details:', error);
+        toast.error('Failed to load property details');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadPropertyDetails();
+  }, [propertyId]);
+
+  const handleIterationGenerated = (iteration: { id: string; image_url: string; version: string }) => {
+    setUndoStack(prev => [...prev, iteration.version]);
+    setCurrentVersion(iteration.version);
+    setRedoStack([]);
+    toast.success(`Generated ${iteration.version}`);
+  };
 
   const toggleIterationSelection = (id: string) => {
     setSelectedIterations(prev => 
@@ -557,7 +614,12 @@ export default function DesignWorkspacePage() {
 
             {/* Right Column: Design Agent Chat */}
             <div className="w-[400px] h-full flex-shrink-0">
-               <ChatInterface />
+               <ChatInterface 
+                 propertyId={propertyId}
+                 roomId={activeRoom.id}
+                 referenceImages={selectedReferences}
+                 onIterationGenerated={handleIterationGenerated}
+               />
             </div>
          </div>
       </main>

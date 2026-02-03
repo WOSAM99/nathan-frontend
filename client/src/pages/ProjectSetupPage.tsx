@@ -1,30 +1,54 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { ArrowLeft, Upload, FileText, ImageIcon, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function ProjectSetupPage() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mlsFiles, setMlsFiles] = useState<File[]>([]);
+  const [compFiles, setCompFiles] = useState<File[]>([]);
+  const [notes, setNotes] = useState("");
+  const mlsInputRef = useRef<HTMLInputElement>(null);
+  const compInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleMlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setMlsFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleCompUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setCompFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (mlsFiles.length === 0) {
+      toast.error("Please upload at least one MLS document");
+      return;
+    }
+    
     setIsSubmitting(true);
     
-    // Mock API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      toast({
-        title: "Project Initialized",
-        description: "Ready to import photos.",
-      });
+    try {
+      const allFiles = [...mlsFiles, ...compFiles];
+      const result = await api.uploadDocument("new", allFiles);
+      toast.success("Project initialized successfully");
       setLocation("/organize");
-    }, 1500);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -56,11 +80,26 @@ export default function ProjectSetupPage() {
              <div className="flex justify-between items-center">
                 <Label className="architectural-label">MLS URL / Listing PDF</Label>
              </div>
-             <div className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group">
+             <input 
+               type="file" 
+               ref={mlsInputRef}
+               onChange={handleMlsUpload}
+               accept=".pdf,.jpg,.jpeg,.png"
+               multiple
+               className="hidden"
+               data-testid="input-mls-file"
+             />
+             <div 
+               onClick={() => mlsInputRef.current?.click()}
+               className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group"
+               data-testid="dropzone-mls"
+             >
                 <div className="w-10 h-10 rounded-full bg-white border border-border flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                    <FileText className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Select or drop file</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {mlsFiles.length > 0 ? `${mlsFiles.length} file(s) selected` : "Select or drop file"}
+                </span>
              </div>
           </div>
 
@@ -68,11 +107,26 @@ export default function ProjectSetupPage() {
              <div className="flex justify-between items-center">
                 <Label className="architectural-label">Comp PDFS / References</Label>
              </div>
-             <div className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group">
+             <input 
+               type="file" 
+               ref={compInputRef}
+               onChange={handleCompUpload}
+               accept=".pdf,.jpg,.jpeg,.png"
+               multiple
+               className="hidden"
+               data-testid="input-comp-file"
+             />
+             <div 
+               onClick={() => compInputRef.current?.click()}
+               className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group"
+               data-testid="dropzone-comp"
+             >
                 <div className="w-10 h-10 rounded-full bg-white border border-border flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                    <Upload className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Add Reference Material</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {compFiles.length > 0 ? `${compFiles.length} file(s) selected` : "Add Reference Material"}
+                </span>
              </div>
           </div>
 
@@ -80,7 +134,10 @@ export default function ProjectSetupPage() {
              <Label className="architectural-label">Optional Notes</Label>
              <Textarea 
                 placeholder="Add specific instructions or client preferences..." 
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 className="architectural-input min-h-[120px] resize-none text-sm"
+                data-testid="input-notes"
              />
           </div>
 
