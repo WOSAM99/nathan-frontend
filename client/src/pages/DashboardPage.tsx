@@ -1,42 +1,52 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import { Link } from "wouter";
+import { api, Project } from "@/lib/api";
+import { toast } from "sonner";
 
-// Mock Data
 import kitchenImg from "@/assets/images/kitchen-modern_1.jpg";
 import livingImg from "@/assets/images/living-room-luxury_1.jpg";
 import bedroomImg from "@/assets/images/bedroom-modern.jpg";
 
-const projects = [
-  {
-    id: "1",
-    title: "123 Magnolia St",
-    location: "Beverly Hills, CA",
-    status: "In Progress" as const,
-    image: livingImg,
-    timeline: "12 Days Left",
-  },
-  {
-    id: "2",
-    title: "458 Silver Lake Blvd",
-    location: "Los Angeles, CA",
-    status: "Completed" as const,
-    image: kitchenImg,
-    roi: "+22.4%",
-  },
-  {
-    id: "3",
-    title: "88 Oakmont Dr",
-    location: "Bel Air, CA",
-    status: "Planning" as const,
-    image: bedroomImg,
-  },
-];
+const fallbackImages = [livingImg, kitchenImg, bedroomImg];
 
 export default function DashboardPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      const data = await api.getProjects();
+      setProjects(data);
+    } catch (error) {
+      toast.error("Failed to load projects");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProjects = projects.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.address.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const getStatusLabel = (status: string): "Planning" | "In Progress" | "Completed" => {
+    switch (status.toLowerCase()) {
+      case 'completed': return 'Completed';
+      case 'in_progress': case 'active': return 'In Progress';
+      default: return 'Planning';
+    }
+  };
   return (
     <Layout 
       title="Project Portfolio"
@@ -57,31 +67,47 @@ export default function DashboardPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
               placeholder="Search addresses..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 rounded-full border-border bg-white shadow-sm hover:shadow-md transition-shadow h-10"
+              data-testid="input-search"
             />
           </div>
-          <Button variant="outline" size="icon" className="rounded-full w-10 h-10 bg-white border-border shadow-sm hover:bg-secondary">
+          <Button variant="outline" size="icon" className="rounded-full w-10 h-10 bg-white border-border shadow-sm hover:bg-secondary" data-testid="button-filter">
             <Filter className="w-4 h-4 text-muted-foreground" />
           </Button>
         </div>
       </div>
 
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8">
-        {projects.map((project) => (
-          <div key={project.id} className="h-[420px]">
-            <ProjectCard {...project} />
+        {filteredProjects.map((project, index) => (
+          <div key={project.property_id} className="h-[420px]">
+            <ProjectCard 
+              id={project.property_id}
+              title={project.name}
+              location={project.address}
+              status={getStatusLabel(project.status)}
+              image={project.thumbnail_url || fallbackImages[index % fallbackImages.length]}
+            />
           </div>
         ))}
 
-        {/* Empty State / Add New Placeholder */}
-        <div className="h-[420px] rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center p-8 text-center hover:border-primary/20 hover:bg-secondary/30 transition-colors group cursor-pointer">
-          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-            <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary" />
+        <Link href="/new-project">
+          <div className="h-[420px] rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center p-8 text-center hover:border-primary/20 hover:bg-secondary/30 transition-colors group cursor-pointer" data-testid="card-add-project">
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+              <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary" />
+            </div>
+            <h3 className="text-lg font-medium text-primary mb-1">Initiate New Project</h3>
+            <p className="text-muted-foreground text-sm max-w-[200px]">Setup takes less than 2 minutes</p>
           </div>
-          <h3 className="text-lg font-medium text-primary mb-1">Initiate New Project</h3>
-          <p className="text-muted-foreground text-sm max-w-[200px]">Setup takes less than 2 minutes</p>
-        </div>
+        </Link>
       </div>
+      )}
       
       <div className="mt-12 pt-8 border-t border-border flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest">
         <span>© 2026 Atelier Interiors</span>

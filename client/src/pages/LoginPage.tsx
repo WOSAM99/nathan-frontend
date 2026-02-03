@@ -2,19 +2,28 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function LoginPage() {
-  const [, setLocation] = useLocation();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLocation("/dashboard");
-    }, 1000);
+    
+    try {
+      await login({ email, password });
+      toast.success("Welcome back!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,8 +44,11 @@ export default function LoginPage() {
             <Input 
               type="email" 
               placeholder="name@studio.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="architectural-input h-12 bg-transparent border-t-0 border-x-0 border-b border-border rounded-none px-0 focus:ring-0 focus:border-primary shadow-none transition-all placeholder:text-muted-foreground/40"
               required
+              data-testid="input-email"
             />
           </div>
 
@@ -45,8 +57,11 @@ export default function LoginPage() {
             <Input 
               type="password" 
               placeholder="••••••••" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="architectural-input h-12 bg-transparent border-t-0 border-x-0 border-b border-border rounded-none px-0 focus:ring-0 focus:border-primary shadow-none transition-all placeholder:text-muted-foreground/40"
               required
+              data-testid="input-password"
             />
           </div>
 
