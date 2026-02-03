@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { ComparisonView } from "@/components/ComparisonView";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock } from "lucide-react";
+import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock, Undo2, Redo2, Star, Download, Trash2, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -30,11 +31,76 @@ const roomCategories = [
 ];
 
 export default function DesignWorkspacePage() {
+  const [, setLocation] = useLocation();
   const [activeComp, setActiveComp] = useState<string | null>(null);
   const [selectedReferences, setSelectedReferences] = useState<string[]>([]);
   const [activeRoom, setActiveRoom] = useState(roomCategories[0]);
   const [roomMenuOpen, setRoomMenuOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>(['v2.3']);
+  const [selectedIterations, setSelectedIterations] = useState<string[]>([]);
+  const [undoStack, setUndoStack] = useState<string[]>(['v2.3', 'v2.2', 'v2.1']);
+  const [redoStack, setRedoStack] = useState<string[]>([]);
+  const [currentVersion, setCurrentVersion] = useState('v2.3');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggleFavorite = (id: string) => {
+    setFavorites(prev => {
+      const newFavorites = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id];
+      toast.success(prev.includes(id) ? 'Removed from favorites' : 'Added to favorites');
+      return newFavorites;
+    });
+  };
+
+  const toggleIterationSelection = (id: string) => {
+    setSelectedIterations(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length > 1) {
+      const current = undoStack[undoStack.length - 1];
+      const previous = undoStack[undoStack.length - 2];
+      setRedoStack(prev => [...prev, current]);
+      setUndoStack(prev => prev.slice(0, -1));
+      setCurrentVersion(previous);
+      toast.success(`Reverted to ${previous}`);
+    }
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length > 0) {
+      const next = redoStack[redoStack.length - 1];
+      setRedoStack(prev => prev.slice(0, -1));
+      setUndoStack(prev => [...prev, next]);
+      setCurrentVersion(next);
+      toast.success(`Restored ${next}`);
+    }
+  };
+
+  const handleDownload = (id: string, label: string) => {
+    toast.success(`Downloading ${label}...`);
+    // In real implementation, this would trigger actual download
+  };
+
+  const handleBulkCompare = () => {
+    if (selectedIterations.length === 2) {
+      toast.success(`Comparing ${selectedIterations[0]} and ${selectedIterations[1]}`);
+    } else {
+      toast.error('Select exactly 2 iterations to compare');
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIterations.length > 0) {
+      toast.success(`Deleted ${selectedIterations.length} iteration(s)`);
+      setSelectedIterations([]);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIterations([]);
+  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -100,11 +166,61 @@ export default function DesignWorkspacePage() {
       {/* Studio Header */}
       <header className="h-16 px-6 flex items-center justify-between bg-white border-b border-border sticky top-0 z-30">
          <div className="flex items-center gap-4">
+            {/* Back Navigation */}
+            <Tooltip>
+               <TooltipTrigger asChild>
+                  <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="h-8 w-8 rounded-full hover:bg-secondary"
+                     onClick={() => setLocation('/dashboard')}
+                     aria-label="Back to dashboard"
+                  >
+                     <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+               </TooltipTrigger>
+               <TooltipContent>Back to Dashboard</TooltipContent>
+            </Tooltip>
+
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-sm">
                 A
             </div>
             <div className="h-6 w-[1px] bg-border" />
             <span className="font-bold text-sm tracking-wide">STUDIO</span>
+
+            {/* Undo/Redo Controls */}
+            <div className="ml-4 flex items-center gap-1 bg-secondary rounded-full p-1">
+               <Tooltip>
+                  <TooltipTrigger asChild>
+                     <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-full hover:bg-white disabled:opacity-40"
+                        onClick={handleUndo}
+                        disabled={undoStack.length <= 1}
+                        aria-label="Undo"
+                     >
+                        <Undo2 className="w-3.5 h-3.5 text-muted-foreground" />
+                     </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Undo (Cmd+Z)</TooltipContent>
+               </Tooltip>
+               <Tooltip>
+                  <TooltipTrigger asChild>
+                     <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-full hover:bg-white disabled:opacity-40"
+                        onClick={handleRedo}
+                        disabled={redoStack.length === 0}
+                        aria-label="Redo"
+                     >
+                        <Redo2 className="w-3.5 h-3.5 text-muted-foreground" />
+                     </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Redo (Cmd+Shift+Z)</TooltipContent>
+               </Tooltip>
+            </div>
             
             <div className="ml-8 relative" ref={menuRef}>
                <button 
@@ -200,8 +316,55 @@ export default function DesignWorkspacePage() {
                            <div className="w-2 h-2 bg-primary/30 rounded-[1px]" />
                         </div>
                         Iteration History
+                        {selectedIterations.length > 0 && (
+                           <Badge variant="secondary" className="ml-2 text-[9px]">
+                              {selectedIterations.length} selected
+                           </Badge>
+                        )}
                      </h3>
-                     <div className="flex gap-2">
+                     <div className="flex gap-2 items-center">
+                        {/* Bulk Action Toolbar */}
+                        {selectedIterations.length > 0 && (
+                           <div className="flex items-center gap-1 mr-2 animate-in fade-in slide-in-from-right-2">
+                              <Tooltip>
+                                 <TooltipTrigger asChild>
+                                    <Button 
+                                       variant="outline" 
+                                       size="sm" 
+                                       className="h-7 px-2 text-xs gap-1 border-border"
+                                       onClick={handleBulkCompare}
+                                       disabled={selectedIterations.length !== 2}
+                                    >
+                                       <GitCompare className="w-3 h-3" />
+                                       Compare
+                                    </Button>
+                                 </TooltipTrigger>
+                                 <TooltipContent>Select exactly 2 to compare</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                 <TooltipTrigger asChild>
+                                    <Button 
+                                       variant="outline" 
+                                       size="sm" 
+                                       className="h-7 px-2 text-xs gap-1 border-border text-red-600 hover:text-red-700 hover:bg-red-50"
+                                       onClick={handleBulkDelete}
+                                    >
+                                       <Trash2 className="w-3 h-3" />
+                                       Delete
+                                    </Button>
+                                 </TooltipTrigger>
+                                 <TooltipContent>Delete selected iterations</TooltipContent>
+                              </Tooltip>
+                              <Button 
+                                 variant="ghost" 
+                                 size="sm" 
+                                 className="h-7 px-2 text-xs text-muted-foreground"
+                                 onClick={clearSelection}
+                              >
+                                 Clear
+                              </Button>
+                           </div>
+                        )}
                         <Button variant="outline" size="icon" className="h-6 w-6 rounded-full border-border">
                            <ChevronRight className="w-3 h-3 rotate-180" />
                         </Button>
@@ -217,29 +380,120 @@ export default function DesignWorkspacePage() {
                         { id: 'v2.2', label: 'Walnut Cabinetry', img: kitchenImg2, timestamp: 'Yesterday', fullTime: 'Feb 2, 2026 at 3:45 PM' },
                         { id: 'v2.1', label: 'Recessed Lighting', img: livingImg, timestamp: '2 days ago', fullTime: 'Feb 1, 2026 at 11:30 AM' },
                         { id: 'v1.5', label: 'Open Floor Conc', img: baselineImg, timestamp: 'Jan 30', fullTime: 'Jan 30, 2026 at 9:15 AM' },
-                     ].map((item) => (
-                        <Tooltip key={item.id}>
-                           <TooltipTrigger asChild>
-                              <div className="group cursor-pointer" role="button" tabIndex={0} aria-label={`${item.label} - ${item.timestamp}`}>
-                                 <div className="aspect-video rounded-lg overflow-hidden border border-border relative mb-2 group-hover:border-primary/50 transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2">
-                                    <img src={item.img} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={item.label} />
-                                    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded text-[9px] font-bold text-primary shadow-sm">
-                                       {item.id}
+                     ].map((item) => {
+                        const isFavorite = favorites.includes(item.id);
+                        const isSelected = selectedIterations.includes(item.id);
+                        const isCurrent = currentVersion === item.id;
+                        return (
+                        <div key={item.id} className="group relative">
+                           {/* Selection Checkbox */}
+                           <button
+                              className={cn(
+                                 "absolute -top-1 -left-1 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                                 isSelected 
+                                    ? "bg-primary border-primary" 
+                                    : "bg-white/90 border-border opacity-0 group-hover:opacity-100"
+                              )}
+                              onClick={(e) => {
+                                 e.stopPropagation();
+                                 toggleIterationSelection(item.id);
+                              }}
+                              aria-label={isSelected ? "Deselect iteration" : "Select iteration"}
+                           >
+                              {isSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
+                           </button>
+
+                           <Tooltip>
+                              <TooltipTrigger asChild>
+                                 <div 
+                                    className={cn(
+                                       "cursor-pointer",
+                                       isSelected && "ring-2 ring-primary ring-offset-2 rounded-lg"
+                                    )} 
+                                    role="button" 
+                                    tabIndex={0} 
+                                    aria-label={`${item.label} - ${item.timestamp}`}
+                                 >
+                                    <div className={cn(
+                                       "aspect-video rounded-lg overflow-hidden border relative mb-2 transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
+                                       isCurrent ? "border-primary border-2" : "border-border group-hover:border-primary/50"
+                                    )}>
+                                       <img src={item.img} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={item.label} />
+                                       
+                                       {/* Version Badge */}
+                                       <div className="absolute top-2 left-2 flex items-center gap-1">
+                                          <span className="bg-white/90 backdrop-blur px-1.5 py-0.5 rounded text-[9px] font-bold text-primary shadow-sm">
+                                             {item.id}
+                                          </span>
+                                          {isCurrent && (
+                                             <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[9px] font-bold shadow-sm">
+                                                CURRENT
+                                             </span>
+                                          )}
+                                       </div>
+
+                                       {/* Action Buttons (top right) */}
+                                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <Tooltip>
+                                             <TooltipTrigger asChild>
+                                                <button
+                                                   className={cn(
+                                                      "w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-sm",
+                                                      isFavorite 
+                                                         ? "bg-amber-400 text-white" 
+                                                         : "bg-white/90 backdrop-blur text-muted-foreground hover:text-amber-500"
+                                                   )}
+                                                   onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      toggleFavorite(item.id);
+                                                   }}
+                                                   aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                                >
+                                                   <Star className={cn("w-3 h-3", isFavorite && "fill-current")} />
+                                                </button>
+                                             </TooltipTrigger>
+                                             <TooltipContent>{isFavorite ? "Remove from favorites" : "Add to favorites"}</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                             <TooltipTrigger asChild>
+                                                <button
+                                                   className="w-6 h-6 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-muted-foreground hover:text-primary transition-colors shadow-sm"
+                                                   onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleDownload(item.id, item.label);
+                                                   }}
+                                                   aria-label="Download iteration"
+                                                >
+                                                   <Download className="w-3 h-3" />
+                                                </button>
+                                             </TooltipTrigger>
+                                             <TooltipContent>Download render</TooltipContent>
+                                          </Tooltip>
+                                       </div>
+
+                                       {/* Timestamp (bottom right) */}
+                                       <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 backdrop-blur px-1.5 py-0.5 rounded text-[9px] text-white flex items-center gap-1">
+                                          <Clock className="w-2.5 h-2.5" />
+                                          {item.timestamp}
+                                       </div>
+
+                                       {/* Favorite indicator when not hovering */}
+                                       {isFavorite && (
+                                          <div className="absolute top-2 right-2 group-hover:opacity-0 transition-opacity">
+                                             <Star className="w-4 h-4 text-amber-400 fill-amber-400 drop-shadow" />
+                                          </div>
+                                       )}
                                     </div>
-                                    <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 backdrop-blur px-1.5 py-0.5 rounded text-[9px] text-white flex items-center gap-1">
-                                       <Clock className="w-2.5 h-2.5" />
-                                       {item.timestamp}
-                                    </div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate group-hover:text-primary transition-colors">{item.label}</p>
                                  </div>
-                                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate group-hover:text-primary transition-colors">{item.label}</p>
-                              </div>
-                           </TooltipTrigger>
-                           <TooltipContent side="bottom" className="text-xs">
-                              <p className="font-medium">{item.label}</p>
-                              <p className="text-muted-foreground">{item.fullTime}</p>
-                           </TooltipContent>
-                        </Tooltip>
-                     ))}
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="text-xs">
+                                 <p className="font-medium">{item.label}</p>
+                                 <p className="text-muted-foreground">{item.fullTime}</p>
+                              </TooltipContent>
+                           </Tooltip>
+                        </div>
+                     )})}
                   </div>
                </div>
 

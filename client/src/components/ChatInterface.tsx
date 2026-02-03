@@ -53,17 +53,38 @@ declare global {
   }
 }
 
-function TypingIndicator() {
+function GeneratingIndicator({ progress }: { progress: number }) {
+  const stages = [
+    { threshold: 0, label: "Analyzing request..." },
+    { threshold: 25, label: "Processing design elements..." },
+    { threshold: 50, label: "Generating render..." },
+    { threshold: 75, label: "Finalizing details..." },
+    { threshold: 95, label: "Almost done..." },
+  ];
+  
+  const currentStage = stages.filter(s => progress >= s.threshold).pop();
+  
   return (
     <div className="flex gap-3">
       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white border border-border text-accent shadow-sm">
         <Bot className="w-4 h-4" />
       </div>
-      <div className="bg-white border border-border p-4 rounded-2xl rounded-tl-none shadow-sm">
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="bg-white border border-border p-4 rounded-2xl rounded-tl-none shadow-sm min-w-[200px]">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{currentStage?.label}</span>
+            <span className="text-[10px] font-medium text-primary">{progress}%</span>
+          </div>
+          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-1.5 pt-1">
+            <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+            <span className="text-[10px] text-amber-600 font-medium">AI is working</span>
+          </div>
         </div>
       </div>
     </div>
@@ -88,7 +109,9 @@ export function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const startListening = () => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -165,22 +188,44 @@ export function ChatInterface() {
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
     setIsTyping(true);
+    setGenerationProgress(0);
+    
+    // Animate progress bar
+    let progress = 0;
+    progressIntervalRef.current = setInterval(() => {
+      progress += Math.random() * 15 + 5;
+      if (progress >= 95) {
+        progress = 95;
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+      }
+      setGenerationProgress(Math.min(Math.round(progress), 95));
+    }, 300);
     
     // Simulate AI response after delay
     setTimeout(() => {
-      setIsTyping(false);
-      const aiResponses = [
-        "I've processed your request and generated a new iteration. The updated design incorporates your feedback while maintaining the overall aesthetic.",
-        "Understood! I'm applying those changes now. The new render shows improved spatial flow based on your direction.",
-        "Great choice! I've updated the design to reflect your preferences. Take a look at the comparison view to see the changes."
-      ];
-      const aiMessage = {
-        id: messages.length + 2,
-        role: "assistant" as const,
-        content: aiResponses[Math.floor(Math.random() * aiResponses.length)]
-      };
-      setMessages(prev => [...prev, aiMessage]);
-    }, 2000);
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      setGenerationProgress(100);
+      
+      setTimeout(() => {
+        setIsTyping(false);
+        setGenerationProgress(0);
+        const aiResponses = [
+          "I've processed your request and generated a new iteration. The updated design incorporates your feedback while maintaining the overall aesthetic.",
+          "Understood! I'm applying those changes now. The new render shows improved spatial flow based on your direction.",
+          "Great choice! I've updated the design to reflect your preferences. Take a look at the comparison view to see the changes."
+        ];
+        const aiMessage = {
+          id: messages.length + 2,
+          role: "assistant" as const,
+          content: aiResponses[Math.floor(Math.random() * aiResponses.length)]
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      }, 300);
+    }, 3000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -230,7 +275,7 @@ export function ChatInterface() {
                 </div>
               </div>
             ))}
-            {isTyping && <TypingIndicator />}
+            {isTyping && <GeneratingIndicator progress={generationProgress} />}
           </div>
         )}
       </ScrollArea>
