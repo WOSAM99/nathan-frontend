@@ -6,8 +6,17 @@ import {
   Images, 
   Settings, 
   LogOut,
-  Palette
+  Palette,
+  User
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -76,9 +85,32 @@ export function Layout({ children, title, actions }: LayoutProps) {
           </div>
           <div className="flex items-center gap-4">
             {actions}
-            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-sm font-medium border border-border">
-              JD
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="outline-none">
+                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-sm font-medium border border-border hover:bg-secondary/80 transition-colors cursor-pointer">
+                  JD
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <Link href="/">
+                  <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
