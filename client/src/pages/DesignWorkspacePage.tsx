@@ -4,15 +4,13 @@ import { ComparisonView } from "@/components/ComparisonView";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, ArrowLeft, X } from "lucide-react";
+import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Mock Images
 import baselineImg from "@/assets/images/room-baseline.jpg";
@@ -26,6 +24,15 @@ import comp4 from "@/assets/images/comp-highland_4.jpg";
 
 export default function DesignWorkspacePage() {
   const [activeComp, setActiveComp] = useState<string | null>(null);
+  const [selectedReferences, setSelectedReferences] = useState<string[]>([]);
+
+  const toggleReference = (img: string) => {
+    setSelectedReferences(prev => 
+      prev.includes(img) 
+        ? prev.filter(i => i !== img) 
+        : [...prev, img]
+    );
+  };
 
   const marketComps = [
       {
@@ -129,48 +136,81 @@ export default function DesignWorkspacePage() {
                   </div>
                   
                   {marketComps.map((comp) => (
-                    <Sheet key={comp.id}>
-                        <SheetTrigger asChild>
-                            <div className="bg-white border border-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
-                                <div>
-                                    <h4 className="text-sm font-medium text-primary group-hover:text-accent transition-colors">{comp.title}</h4>
-                                    <p className="text-xs text-muted-foreground mt-1">Matched {comp.match} similarity to subject property layout.</p>
-                                </div>
-                                <Badge variant="secondary" className="bg-secondary text-primary border-none group-hover:bg-primary group-hover:text-white transition-colors">
-                                    {comp.assets.length} ASSETS
-                                </Badge>
-                            </div>
-                        </SheetTrigger>
-                        <SheetContent side="bottom" className="h-[80vh] rounded-t-3xl border-t border-border shadow-2xl p-0">
-                            <div className="h-full flex flex-col">
-                                <div className="p-8 border-b border-border flex items-center justify-between bg-white rounded-t-3xl sticky top-0 z-10">
-                                    <div>
-                                        <h2 className="text-xl font-light text-primary">{comp.title}</h2>
-                                        <p className="text-sm text-muted-foreground mt-1">Visual Reference Library • {comp.match} Match</p>
+                    <Collapsible 
+                        key={comp.id} 
+                        open={activeComp === comp.id}
+                        onOpenChange={() => setActiveComp(activeComp === comp.id ? null : comp.id)}
+                        className="bg-white border border-border rounded-xl shadow-sm transition-all duration-300"
+                    >
+                        <div className="p-1">
+                            <CollapsibleTrigger asChild>
+                                <div className="p-3 flex items-center justify-between cursor-pointer rounded-lg hover:bg-secondary/50 transition-colors group">
+                                    <div className="flex items-center justify-between w-full">
+                                        <div>
+                                            <h4 className="text-sm font-medium text-primary group-hover:text-accent transition-colors">{comp.title}</h4>
+                                            <p className="text-xs text-muted-foreground mt-1">Matched {comp.match} similarity to subject property layout.</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <Badge variant="secondary" className="bg-secondary text-primary border-none group-hover:bg-primary group-hover:text-white transition-colors">
+                                                {comp.assets.length} ASSETS
+                                            </Badge>
+                                            <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform duration-300", activeComp === comp.id && "rotate-180")} />
+                                        </div>
                                     </div>
-                                    <Button variant="outline" className="rounded-full border-border">
-                                        Use as Reference
-                                    </Button>
                                 </div>
-                                <div className="flex-1 overflow-auto p-8 bg-[#f8f9fa]">
-                                    <div className="grid grid-cols-4 gap-6">
-                                        {comp.assets.map((img, i) => (
-                                            <div key={i} className="group cursor-pointer">
-                                                <div className="aspect-[4/3] rounded-xl overflow-hidden shadow-sm relative mb-3 group-hover:shadow-lg transition-all duration-300">
-                                                    <img src={img} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                                                    <Button size="sm" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 rounded-full bg-white text-primary hover:bg-white/90 shadow-lg text-xs font-bold uppercase tracking-wider scale-90 group-hover:scale-100 transition-all">
-                                                        Apply Style
-                                                    </Button>
+                            </CollapsibleTrigger>
+                        </div>
+                        
+                        <CollapsibleContent>
+                            <div className="px-4 pb-4 pt-0">
+                                <div className="bg-[#f8f9fa] rounded-lg p-4 border border-border/50">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Reference Assets</p>
+                                        {selectedReferences.length > 0 && (
+                                            <span className="text-xs text-primary font-medium flex items-center gap-1">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                {selectedReferences.length} selected as reference
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        {comp.assets.map((img, i) => {
+                                            const isSelected = selectedReferences.includes(img);
+                                            return (
+                                                <div 
+                                                    key={i} 
+                                                    className={cn(
+                                                        "group cursor-pointer relative aspect-[4/3] rounded-lg overflow-hidden transition-all duration-200",
+                                                        isSelected ? "ring-2 ring-primary ring-offset-2" : "hover:shadow-md"
+                                                    )}
+                                                    onClick={() => toggleReference(img)}
+                                                >
+                                                    <img src={img} className="w-full h-full object-cover" />
+                                                    
+                                                    {/* Selection Overlay */}
+                                                    <div className={cn(
+                                                        "absolute inset-0 transition-colors duration-200 flex items-center justify-center",
+                                                        isSelected ? "bg-primary/20" : "bg-black/0 group-hover:bg-black/10"
+                                                    )}>
+                                                        {isSelected && (
+                                                            <div className="bg-primary text-white rounded-full p-1 shadow-sm animate-in zoom-in">
+                                                                <CheckCircle2 className="w-5 h-5" />
+                                                            </div>
+                                                        )}
+                                                        {!isSelected && (
+                                                            <div className="opacity-0 group-hover:opacity-100 bg-white/90 backdrop-blur px-2 py-1 rounded-full text-[10px] font-bold text-primary uppercase tracking-wide shadow-sm transform translate-y-2 group-hover:translate-y-0 transition-all">
+                                                                Select
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Reference View 0{i+1}</p>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
-                        </SheetContent>
-                    </Sheet>
+                        </CollapsibleContent>
+                    </Collapsible>
                   ))}
                </div>
             </div>
