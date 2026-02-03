@@ -1,10 +1,107 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, Sparkles, Paperclip, Mic } from "lucide-react";
+import { Send, Bot, Sparkles, Paperclip, Mic, MicOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: ((this: ISpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: ISpeechRecognition, ev: Event) => void) | null;
+  onerror: ((this: ISpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((this: ISpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
 
 export function ChatInterface() {
+  const [inputValue, setInputValue] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+
+  const startListening = () => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognitionAPI) {
+      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInputValue(transcript);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -67,15 +164,32 @@ export function ChatInterface() {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Input 
-                className="pr-10 h-12 rounded-xl bg-background border-border shadow-inner text-sm" 
-                placeholder="Direct the AI to refine the design..." 
+                className={cn(
+                  "pr-20 h-12 rounded-xl bg-background border-border shadow-inner text-sm",
+                  isListening && "border-red-400 ring-2 ring-red-400/20"
+                )}
+                placeholder={isListening ? "Listening..." : "Direct the AI to refine the design..."} 
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                data-testid="chat-input"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-full">
+                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-full" data-testid="button-attach">
                     <Paperclip className="w-4 h-4" />
                  </Button>
-                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-full">
-                    <Mic className="w-4 h-4" />
+                 <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className={cn(
+                      "h-8 w-8 rounded-full transition-colors",
+                      isListening 
+                        ? "bg-red-500 text-white hover:bg-red-600" 
+                        : "text-muted-foreground hover:text-primary"
+                    )}
+                    onClick={startListening}
+                    data-testid="button-mic"
+                 >
+                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                  </Button>
               </div>
             </div>
