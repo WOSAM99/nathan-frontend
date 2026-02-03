@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { ComparisonView } from "@/components/ComparisonView";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2 } from "lucide-react";
+import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Mock Images
@@ -17,9 +17,33 @@ import comp2 from "@/assets/images/comp-highland_2.jpg";
 import comp3 from "@/assets/images/comp-highland_3.jpg";
 import comp4 from "@/assets/images/comp-highland_4.jpg";
 
+const roomCategories = [
+  { id: 'kitchen', label: 'Kitchen', icon: Utensils, count: 4 },
+  { id: 'living', label: 'Living Room', icon: Sofa, count: 3 },
+  { id: 'bedroom', label: 'Master Bedroom', icon: Bed, count: 2 },
+  { id: 'bathroom', label: 'Primary Bath', icon: Bath, count: 2 },
+  { id: 'exterior', label: 'Exterior', icon: Trees, count: 5 },
+  { id: 'garage', label: 'Garage', icon: Car, count: 1 },
+  { id: 'entry', label: 'Entry/Foyer', icon: Home, count: 1 },
+];
+
 export default function DesignWorkspacePage() {
   const [activeComp, setActiveComp] = useState<string | null>(null);
   const [selectedReferences, setSelectedReferences] = useState<string[]>([]);
+  const [activeRoom, setActiveRoom] = useState(roomCategories[0]);
+  const [roomMenuOpen, setRoomMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setRoomMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleReference = (img: string) => {
     setSelectedReferences(prev => 
@@ -49,10 +73,63 @@ export default function DesignWorkspacePage() {
             <div className="h-6 w-[1px] bg-border" />
             <span className="font-bold text-sm tracking-wide">STUDIO</span>
             
-            <div className="ml-8 flex items-center gap-2 bg-secondary px-3 py-1.5 rounded-full border border-border">
-               <span className="architectural-label text-[9px] text-muted-foreground">ACTIVE SPACE</span>
-               <span className="text-xs font-medium text-primary">Kitchen</span>
-               <ChevronRight className="w-3 h-3 text-muted-foreground rotate-90" />
+            <div className="ml-8 relative" ref={menuRef}>
+               <button 
+                  onClick={() => setRoomMenuOpen(!roomMenuOpen)}
+                  className={cn(
+                     "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all",
+                     roomMenuOpen 
+                        ? "bg-primary text-white border-primary" 
+                        : "bg-secondary border-border hover:border-primary/50"
+                  )}
+                  data-testid="room-category-dropdown"
+               >
+                  <span className={cn("architectural-label text-[9px]", roomMenuOpen ? "text-white/70" : "text-muted-foreground")}>ACTIVE SPACE</span>
+                  <activeRoom.icon className={cn("w-3.5 h-3.5", roomMenuOpen ? "text-white" : "text-primary")} />
+                  <span className={cn("text-xs font-medium", roomMenuOpen ? "text-white" : "text-primary")}>{activeRoom.label}</span>
+                  <ChevronDown className={cn("w-3 h-3 transition-transform", roomMenuOpen ? "text-white rotate-180" : "text-muted-foreground")} />
+               </button>
+
+               {/* Dropdown Menu */}
+               {roomMenuOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl border border-border shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                     <div className="p-2 border-b border-border bg-secondary/50">
+                        <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium px-2">Room Categories</p>
+                     </div>
+                     <div className="p-2 max-h-[300px] overflow-y-auto">
+                        {roomCategories.map((room) => {
+                           const isActive = activeRoom.id === room.id;
+                           return (
+                              <button
+                                 key={room.id}
+                                 onClick={() => {
+                                    setActiveRoom(room);
+                                    setRoomMenuOpen(false);
+                                 }}
+                                 className={cn(
+                                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left group",
+                                    isActive 
+                                       ? "bg-primary text-white" 
+                                       : "hover:bg-secondary"
+                                 )}
+                                 data-testid={`room-option-${room.id}`}
+                              >
+                                 <room.icon className={cn("w-4 h-4", isActive ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
+                                 <span className={cn("text-sm font-medium flex-1", isActive ? "text-white" : "text-primary")}>{room.label}</span>
+                                 <span className={cn(
+                                    "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                                    isActive 
+                                       ? "bg-white/20 text-white" 
+                                       : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                                 )}>
+                                    {room.count} photos
+                                 </span>
+                              </button>
+                           );
+                        })}
+                     </div>
+                  </div>
+               )}
             </div>
          </div>
 
