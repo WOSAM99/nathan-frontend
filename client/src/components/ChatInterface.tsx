@@ -64,12 +64,6 @@ export function ChatInterface() {
 
       <div className="p-4 bg-white border-t border-border">
         <div className="relative">
-          <div className="absolute -top-10 left-0 right-0 flex justify-center gap-2">
-             <Button variant="outline" size="sm" className="bg-white/90 backdrop-blur text-xs rounded-full h-7 border-border shadow-sm text-muted-foreground hover:text-primary">
-                "Change countertop to marble"
-             </Button>
-          </div>
-          
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Input 
