@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { ComparisonView } from "@/components/ComparisonView";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChevronRight, ChevronDown, ArrowLeft, X, CheckCircle2, Home, Utensils, Sofa, Bed, Bath, Trees, Car, Building, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // Mock Images
 import baselineImg from "@/assets/images/room-baseline.jpg";
@@ -44,6 +46,37 @@ export default function DesignWorkspacePage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Escape to close dropdown
+      if (event.key === 'Escape' && roomMenuOpen) {
+        setRoomMenuOpen(false);
+        return;
+      }
+      
+      // Arrow keys for room navigation when dropdown is open
+      if (roomMenuOpen) {
+        const currentIndex = roomCategories.findIndex(r => r.id === activeRoom.id);
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          const nextIndex = (currentIndex + 1) % roomCategories.length;
+          setActiveRoom(roomCategories[nextIndex]);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          const prevIndex = (currentIndex - 1 + roomCategories.length) % roomCategories.length;
+          setActiveRoom(roomCategories[prevIndex]);
+        } else if (event.key === 'Enter') {
+          setRoomMenuOpen(false);
+          toast.success(`Switched to ${activeRoom.label}`);
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [roomMenuOpen, activeRoom]);
 
   const toggleReference = (img: string) => {
     setSelectedReferences(prev => 
@@ -180,20 +213,32 @@ export default function DesignWorkspacePage() {
                   
                   <div className="grid grid-cols-4 gap-4">
                      {[
-                        { id: 'v2.3', label: 'Polished Marble Edit', img: kitchenImg },
-                        { id: 'v2.2', label: 'Walnut Cabinetry', img: kitchenImg2 },
-                        { id: 'v2.1', label: 'Recessed Lighting', img: livingImg },
-                        { id: 'v1.5', label: 'Open Floor Conc', img: baselineImg },
+                        { id: 'v2.3', label: 'Polished Marble Edit', img: kitchenImg, timestamp: '2 hours ago', fullTime: 'Feb 3, 2026 at 10:24 AM' },
+                        { id: 'v2.2', label: 'Walnut Cabinetry', img: kitchenImg2, timestamp: 'Yesterday', fullTime: 'Feb 2, 2026 at 3:45 PM' },
+                        { id: 'v2.1', label: 'Recessed Lighting', img: livingImg, timestamp: '2 days ago', fullTime: 'Feb 1, 2026 at 11:30 AM' },
+                        { id: 'v1.5', label: 'Open Floor Conc', img: baselineImg, timestamp: 'Jan 30', fullTime: 'Jan 30, 2026 at 9:15 AM' },
                      ].map((item) => (
-                        <div key={item.id} className="group cursor-pointer">
-                           <div className="aspect-video rounded-lg overflow-hidden border border-border relative mb-2 group-hover:border-primary/50 transition-colors">
-                              <img src={item.img} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={item.label} />
-                              <div className="absolute top-2 left-2 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded text-[9px] font-bold text-primary shadow-sm">
-                                 {item.id}
+                        <Tooltip key={item.id}>
+                           <TooltipTrigger asChild>
+                              <div className="group cursor-pointer" role="button" tabIndex={0} aria-label={`${item.label} - ${item.timestamp}`}>
+                                 <div className="aspect-video rounded-lg overflow-hidden border border-border relative mb-2 group-hover:border-primary/50 transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2">
+                                    <img src={item.img} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={item.label} />
+                                    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded text-[9px] font-bold text-primary shadow-sm">
+                                       {item.id}
+                                    </div>
+                                    <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 backdrop-blur px-1.5 py-0.5 rounded text-[9px] text-white flex items-center gap-1">
+                                       <Clock className="w-2.5 h-2.5" />
+                                       {item.timestamp}
+                                    </div>
+                                 </div>
+                                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate group-hover:text-primary transition-colors">{item.label}</p>
                               </div>
-                           </div>
-                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate group-hover:text-primary transition-colors">{item.label}</p>
-                        </div>
+                           </TooltipTrigger>
+                           <TooltipContent side="bottom" className="text-xs">
+                              <p className="font-medium">{item.label}</p>
+                              <p className="text-muted-foreground">{item.fullTime}</p>
+                           </TooltipContent>
+                        </Tooltip>
                      ))}
                   </div>
                </div>
