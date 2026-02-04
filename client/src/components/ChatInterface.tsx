@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, Sparkles, Paperclip, Mic, MicOff } from "lucide-react";
@@ -63,9 +63,9 @@ function GeneratingIndicator({ progress }: { progress: number }) {
     { threshold: 75, label: "Finalizing details..." },
     { threshold: 95, label: "Almost done..." },
   ];
-  
+
   const currentStage = stages.filter(s => progress >= s.threshold).pop();
-  
+
   return (
     <div className="flex gap-3">
       <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white border border-border text-accent shadow-sm">
@@ -78,7 +78,7 @@ function GeneratingIndicator({ progress }: { progress: number }) {
             <span className="text-[10px] font-medium text-primary">{progress}%</span>
           </div>
           <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-300 ease-out"
               style={{ width: `${progress}%` }}
             />
@@ -101,7 +101,7 @@ function EmptyState() {
       </div>
       <h3 className="text-sm font-medium text-primary mb-2">Start a Conversation</h3>
       <p className="text-xs text-muted-foreground max-w-[240px]">
-        Describe design changes you'd like to explore, and the AI will generate new iterations for your space.
+        Select images from the MLS or Comps sections and describe changes to generate new designs.
       </p>
     </div>
   );
@@ -109,22 +109,23 @@ function EmptyState() {
 
 interface ChatInterfaceProps {
   propertyId?: string;
-  roomId?: string;
   referenceImages?: string[];
   onIterationGenerated?: (iteration: { id: string; image_url: string; version: string }) => void;
 }
 
-export function ChatInterface({ propertyId, roomId, referenceImages = [], onIterationGenerated }: ChatInterfaceProps) {
+export function ChatInterface({ propertyId, referenceImages = [], onIterationGenerated }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for scrolling
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const startListening = () => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognitionAPI) {
       alert("Speech recognition is not supported in this browser. Please use Chrome.");
       return;
@@ -166,39 +167,37 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
     recognition.start();
   };
 
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      role: "assistant",
-      content: "I've analyzed the primary kitchen lighting and cabinetry from Comp B. Would you like to port the White Oak finish or the Brushed Nickel hardware first?"
-    },
-    {
-      id: 2,
-      role: "user",
-      content: "Let's go with the White Oak finish for the cabinets and keep the existing layout."
-    },
-    {
-      id: 3,
-      role: "assistant",
-      content: "Render complete. I've updated the cabinetry with the White Oak texture and balanced the lighting to match the reference pavilion.",
-      image: "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?auto=format&fit=crop&q=80&w=600"
-    }
-  ]);
+  const [messages, setMessages] = useState<Array<{
+    id: number;
+    role: "assistant" | "user";
+    content: string;
+    image?: string;
+  }>>([]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
+
 
   const handleSubmit = async () => {
     if (!inputValue.trim()) return;
-    
+
     const userMessage = {
       id: messages.length + 1,
       role: "user" as const,
       content: inputValue
     };
     setMessages(prev => [...prev, userMessage]);
+
     const prompt = inputValue;
     setInputValue("");
     setIsTyping(true);
     setGenerationProgress(0);
-    
+
     let progress = 0;
     progressIntervalRef.current = setInterval(() => {
       progress += Math.random() * 15 + 5;
@@ -210,64 +209,67 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
       }
       setGenerationProgress(Math.min(Math.round(progress), 95));
     }, 300);
-    
+
     try {
-      if (propertyId && roomId) {
+      // Backend requires image_ids, not room_id
+      // For now, use referenceImages as image IDs if available
+      if (propertyId && referenceImages.length > 0) {
+        console.log("Generating with references:", referenceImages);
         const result = await api.regenerateDesign({
           property_id: propertyId,
-          room_id: roomId,
-          prompt: prompt,
-          reference_images: referenceImages,
+          image_ids: referenceImages,
+          user_feedback: prompt,
         });
-        
+
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
         }
         setGenerationProgress(100);
-        
+
         setTimeout(() => {
           setIsTyping(false);
           setGenerationProgress(0);
-          
+
           const aiMessage = {
             id: messages.length + 2,
             role: "assistant" as const,
-            content: `I've generated a new design iteration (${result.version}). The updated render reflects your feedback.`,
-            image: result.image_url
+            content: result.description || result.message,
+            image: result.regenerated_images[0]?.url
           };
           setMessages(prev => [...prev, aiMessage]);
-          
-          if (onIterationGenerated) {
+
+          if (onIterationGenerated && result.regenerated_images[0]) {
             onIterationGenerated({
-              id: result.iteration_id,
-              image_url: result.image_url,
-              version: result.version,
+              id: crypto.randomUUID(),
+              image_url: result.regenerated_images[0].url,
+              version: `v${Date.now()}`,
             });
           }
         }, 300);
       } else {
-        setTimeout(() => {
-          if (progressIntervalRef.current) {
-            clearInterval(progressIntervalRef.current);
-          }
-          setGenerationProgress(100);
-          
-          setTimeout(() => {
-            setIsTyping(false);
-            setGenerationProgress(0);
-            const aiResponses = [
-              "I've processed your request and generated a new iteration. The updated design incorporates your feedback while maintaining the overall aesthetic.",
-              "Understood! I'm applying those changes now. The new render shows improved spatial flow based on your direction.",
-              "Great choice! I've updated the design to reflect your preferences. Take a look at the comparison view to see the changes."
-            ];
-            const aiMessage = {
-              id: messages.length + 2,
-              role: "assistant" as const,
-              content: aiResponses[Math.floor(Math.random() * aiResponses.length)]
-            };
-            setMessages(prev => [...prev, aiMessage]);
-          }, 300);
-        }, 3000);
+        // Fallback if no references selected - maybe specific message?
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+        }
+        setGenerationProgress(0);
+        setIsTyping(false);
+
+        if (!propertyId) {
+          toast.error("No property context found.");
+          return;
+        }
+
+        // Allow chatting without references? Or warn?
+        // Since user requested "select multiple images ... then regenerate", we should probably warn if none selected.
+        if (referenceImages.length === 0) {
+          const warningMsg = {
+            id: messages.length + 2,
+            role: "assistant" as const,
+            content: "Please select at least one MLS or Comp image to use as reference before generating."
+          };
+          setMessages(prev => [...prev, warningMsg]);
+          return;
+        }
       }
     } catch (error) {
       if (progressIntervalRef.current) {
@@ -276,7 +278,7 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
       setIsTyping(false);
       setGenerationProgress(0);
       toast.error(error instanceof Error ? error.message : "Failed to generate design");
-      
+
       const errorMessage = {
         id: messages.length + 2,
         role: "assistant" as const,
@@ -300,9 +302,16 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
           <h3 className="architectural-label text-primary">Design Agent</h3>
           {isTyping && <span className="text-[10px] text-amber-600 font-medium">Generating...</span>}
         </div>
-        <button className="text-[10px] text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1" aria-label="View chat history">
-          History
-        </button>
+        <div className="flex items-center gap-2">
+          {referenceImages.length > 0 && (
+            <span className="text-[10px] bg-secondary px-2 py-0.5 rounded text-muted-foreground">
+              {referenceImages.length} refs
+            </span>
+          )}
+          <button className="text-[10px] text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1" aria-label="View chat history">
+            History
+          </button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1 p-4 bg-background/50">
@@ -315,16 +324,15 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "assistant" ? "bg-white border border-border text-accent shadow-sm" : "bg-primary text-white"}`} aria-hidden="true">
                   {msg.role === "assistant" ? <Bot className="w-4 h-4" /> : <div className="text-xs font-bold">JD</div>}
                 </div>
-                
+
                 <div className={`flex flex-col gap-2 max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                  <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                    msg.role === "assistant" 
-                      ? "bg-white border border-border text-primary rounded-tl-none" 
-                      : "bg-primary text-primary-foreground rounded-tr-none"
-                  }`}>
+                  <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.role === "assistant"
+                    ? "bg-white border border-border text-primary rounded-tl-none"
+                    : "bg-primary text-primary-foreground rounded-tr-none"
+                    }`}>
                     {msg.content}
                   </div>
-                  
+
                   {msg.image && (
                     <div className="rounded-xl overflow-hidden border border-border shadow-sm w-full max-w-[240px]">
                       <img src={msg.image} alt="Render result" className="w-full h-auto" />
@@ -334,6 +342,7 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
               </div>
             ))}
             {isTyping && <GeneratingIndicator progress={generationProgress} />}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </ScrollArea>
@@ -342,12 +351,12 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
         <div className="relative">
           <div className="flex gap-2">
             <div className="flex-1 relative">
-              <Input 
+              <Input
                 className={cn(
                   "pr-20 h-12 rounded-xl bg-background border-border shadow-inner text-sm focus:ring-2 focus:ring-primary focus:ring-offset-1",
                   isListening && "border-red-400 ring-2 ring-red-400/20"
                 )}
-                placeholder={isListening ? "Listening..." : "Direct the AI to refine the design..."} 
+                placeholder={isListening ? "Listening..." : "Direct the AI to refine the design..."}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -356,35 +365,35 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
                 aria-label="Chat message input"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                 <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="h-8 w-8 text-muted-foreground hover:text-primary rounded-full focus:ring-2 focus:ring-primary focus:ring-offset-1" 
-                    data-testid="button-attach"
-                    aria-label="Attach file"
-                 >
-                    <Paperclip className="w-4 h-4" />
-                 </Button>
-                 <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className={cn(
-                      "h-8 w-8 rounded-full transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                      isListening 
-                        ? "bg-red-500 text-white hover:bg-red-600" 
-                        : "text-muted-foreground hover:text-primary"
-                    )}
-                    onClick={startListening}
-                    data-testid="button-mic"
-                    aria-label={isListening ? "Stop listening" : "Start voice input"}
-                    aria-pressed={isListening}
-                 >
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                 </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary rounded-full focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                  data-testid="button-attach"
+                  aria-label="Attach file"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8 rounded-full transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                    isListening
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "text-muted-foreground hover:text-primary"
+                  )}
+                  onClick={startListening}
+                  data-testid="button-mic"
+                  aria-label={isListening ? "Stop listening" : "Start voice input"}
+                  aria-pressed={isListening}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </Button>
               </div>
             </div>
-            <Button 
-              size="icon" 
+            <Button
+              size="icon"
               className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleSubmit}
               disabled={!inputValue.trim() || isTyping}
@@ -394,7 +403,7 @@ export function ChatInterface({ propertyId, roomId, referenceImages = [], onIter
             </Button>
           </div>
           <div className="text-center mt-3">
-             <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">Press CMD + Enter to Submit</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">Press CMD + Enter to Submit</span>
           </div>
         </div>
       </div>

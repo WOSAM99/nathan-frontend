@@ -14,7 +14,7 @@ interface LoginRequest {
 interface RegisterRequest {
   email: string;
   password: string;
-  name: string;
+  full_name: string;
 }
 
 interface User {
@@ -25,22 +25,33 @@ interface User {
 
 interface Project {
   property_id: string;
-  name: string;
-  address: string;
-  status: string;
+  user_id: string;
   created_at: string;
-  updated_at: string;
+  total_images: number;
   thumbnail_url?: string;
+  pdf_urls: string[];
+}
+
+interface PropertyImage {
+  id: string;
+  filename: string;
+  page: number;
+  caption: string;
+  mime_type: string;
+  file_type?: string;
+  category?: string;
+  url?: string; // Optional if available directly
 }
 
 interface PropertyDetails {
   property_id: string;
-  name: string;
-  address: string;
-  status: string;
-  rooms: Room[];
-  images: PropertyImage[];
-  iterations: Iteration[];
+  user_id: string;
+  // Backend returns separate lists
+  mls_images: PropertyImage[];
+  comps_images: PropertyImage[];
+  pdf_urls: string[];
+  created_at: string;
+  chat_history: any[];
 }
 
 interface Room {
@@ -48,14 +59,6 @@ interface Room {
   name: string;
   type: string;
   image_count: number;
-}
-
-interface PropertyImage {
-  id: string;
-  url: string;
-  room_id?: string;
-  category?: string;
-  created_at: string;
 }
 
 interface Iteration {
@@ -69,15 +72,15 @@ interface Iteration {
 
 interface ChatRegenerateRequest {
   property_id: string;
-  room_id: string;
-  prompt: string;
-  reference_images?: string[];
+  image_ids: string[];
+  user_feedback: string;
 }
 
 interface ChatRegenerateResponse {
-  iteration_id: string;
-  image_url: string;
-  version: string;
+  regenerated_images: Array<{ url: string; mime_type: string }>;
+  description: string;
+  input_count: number;
+  message: string;
 }
 
 class ApiClient {
@@ -89,45 +92,63 @@ class ApiClient {
     this.refreshToken = localStorage.getItem('refresh_token');
   }
 
+  private unwrapResponse<T>(response: any): T {
+    // Backend wraps responses in {success, data, message}
+    if (response.success === false) {
+      throw new Error(response.message || 'API Error');
+    }
+    // Return data field if it exists, otherwise return response as-is
+    return (response.data !== undefined ? response.data : response) as T;
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const headers: HeadersInit = {
+    // Always get fresh tokens from localStorage
+    this.accessToken = localStorage.getItem('access_token');
+    this.refreshToken = localStorage.getItem('refresh_token');
+
+    console.log(`[API] ${options.method || 'GET'} ${endpoint}`, {
+      hasAccessToken: !!this.accessToken,
+      tokenPreview: this.accessToken?.substring(0, 20) + '...'
+    });
+
+    // Create headers object with proper typing
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
     };
 
+    // Merge any existing headers from options
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
+
+    // Add Authorization header if token exists
     if (this.accessToken) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.accessToken}`;
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      console.log(`[API] Authorization header set:`, headers['Authorization'].substring(0, 30) + '...');
+    } else {
+      console.warn(`[API] No access token available for ${endpoint}`);
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Include cookies for refresh token
     });
 
-    if (response.status === 401 && this.refreshToken) {
-      const refreshed = await this.refreshTokens();
-      if (refreshed) {
-        (headers as Record<string, string>)['Authorization'] = `Bearer ${this.accessToken}`;
-        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
-          ...options,
-          headers,
-        });
-        if (!retryResponse.ok) {
-          throw new Error(`API Error: ${retryResponse.status}`);
-        }
-        return retryResponse.json();
-      }
-    }
-
+    // Don't automatically refresh on 401 - let the error propagate
+    // Only refresh when we get a specific "token expired" error
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `API Error: ${response.status}`);
+      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      console.error(`[API] Error ${response.status}:`, error.message);
+      // Backend uses 'message' field for errors, not 'detail'
+      throw new Error(error.message || `API Error: ${response.status}`);
     }
 
-    return response.json();
+    const json = await response.json();
+    return this.unwrapResponse<T>(json);
   }
 
   private async refreshTokens(): Promise<boolean> {
@@ -135,7 +156,8 @@ class ApiClient {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: this.refreshToken }),
+        credentials: 'include', // Send HttpOnly cookie automatically
+        // No body - backend uses cookie
       });
 
       if (!response.ok) {
@@ -143,7 +165,8 @@ class ApiClient {
         return false;
       }
 
-      const tokens: AuthTokens = await response.json();
+      const json = await response.json();
+      const tokens = this.unwrapResponse<AuthTokens>(json);
       this.setTokens(tokens);
       return true;
     } catch {
@@ -175,6 +198,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    console.log('Login response tokens:', tokens);
     this.setTokens(tokens);
     return tokens;
   }
@@ -184,6 +208,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    console.log('Register response tokens:', tokens);
     this.setTokens(tokens);
     return tokens;
   }
@@ -197,37 +222,71 @@ class ApiClient {
   }
 
   async getProjects(): Promise<Project[]> {
-    return this.request<Project[]>('/doc/projects');
+    const response = await this.request<any[]>('/doc/projects');
+    // Map backend PropertyData to frontend Project interface
+    return response.map(p => ({
+      property_id: p.property_id,
+      user_id: p.user_id,
+      created_at: p.created_at,
+      total_images: (p.files || []).length, // Fallback for list view
+      thumbnail_url: p.files?.[0]?.id ? this.getImageUrl(p.files[0].id) : undefined,
+      pdf_urls: p.pdf_urls || []
+    }));
   }
 
   async getPropertyDetails(propertyId: string): Promise<PropertyDetails> {
     return this.request<PropertyDetails>(`/doc/${propertyId}`);
   }
 
-  async uploadDocument(propertyId: string, files: File[], notes?: string): Promise<{ success: boolean; message: string; property_id: string }> {
+  async uploadPDF(files: File[], propertyId: string, fileType: 'mls' | 'comps' = 'mls'): Promise<{ success: boolean; message: string; property_id: string }> {
+    // Always get fresh token from localStorage
+    this.accessToken = localStorage.getItem('access_token');
+
     const formData = new FormData();
-    if (propertyId && propertyId !== 'new') {
-      formData.append('property_id', propertyId);
-    }
+    // Always send property_id (generate UUID if new)
+    const actualPropertyId = propertyId === 'new'
+      ? crypto.randomUUID()
+      : propertyId;
+    formData.append('property_id', actualPropertyId);
+    formData.append('file_type', fileType);
+
     files.forEach(file => formData.append('files', file));
-    if (notes) {
-      formData.append('notes', notes);
-    }
 
     const response = await fetch(`${API_BASE_URL}/doc/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.accessToken}`,
+        // Content-Type not set for FormData
       },
+      credentials: 'include',
       body: formData,
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
-      throw new Error(error.detail);
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message);
     }
 
-    return response.json();
+    const json = await response.json();
+    const unwrapped = this.unwrapResponse<any>(json);
+
+    return {
+      success: true,
+      message: unwrapped.message || 'Upload successful',
+      property_id: unwrapped.property_id
+    };
+  }
+
+  // Alias for backward compatibility if needed, but updated signature is better
+  async uploadDocument(propertyId: string, files: File[], notes?: string, fileType: 'mls' | 'comps' = 'mls'): Promise<{ success: boolean; message: string; property_id: string }> {
+    return this.uploadPDF(files, propertyId, fileType);
+  }
+
+  async updateImageCategory(propertyId: string, imageId: string, category: string): Promise<any> {
+    return this.request(`/doc/image/${propertyId}/${imageId}/category`, {
+      method: 'PUT',
+      body: JSON.stringify({ category }),
+    });
   }
 
   async regenerateDesign(data: ChatRegenerateRequest): Promise<ChatRegenerateResponse> {

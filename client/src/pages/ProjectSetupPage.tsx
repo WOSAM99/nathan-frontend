@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
-import { ArrowLeft, Upload, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -19,37 +19,88 @@ export default function ProjectSetupPage() {
 
   const handleMlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setMlsFiles(Array.from(e.target.files));
+      setMlsFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
     }
   };
 
   const handleCompUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setCompFiles(Array.from(e.target.files));
+      setCompFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
     }
+  };
+
+  const removeMlsFile = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMlsFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeCompFile = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCompFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (mlsFiles.length === 0) {
-      toast.error("Please upload at least one MLS document");
+
+    // User must upload at least MLS 
+    // (Technically they could just do Comps, but usually project needs Subject Property)
+    if (mlsFiles.length === 0 && compFiles.length === 0) {
+      toast.error("Please upload at least one document");
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+    let propertyId = 'new';
+
     try {
-      const allFiles = [...mlsFiles, ...compFiles];
-      const result = await api.uploadDocument("new", allFiles, notes);
-      toast.success("Project initialized successfully");
-      if (result.property_id) {
-        setLocation(`/organize/${result.property_id}`);
-      } else {
-        setLocation("/organize");
+      // 1. Upload MLS Files (if any)
+      if (mlsFiles.length > 0) {
+        const result = await api.uploadPDF(mlsFiles, propertyId, 'mls');
+        propertyId = result.property_id;
       }
+
+      // 2. Upload Comp Files (if any)
+      if (compFiles.length > 0) {
+        // If we didn't upload MLS, propertyId is technically still 'new', 
+        // which would create a project just from Comps. accepted behavior.
+        // If we DID upload MLS, propertyId is now the UUID, so we append Comps to it.
+        await api.uploadPDF(compFiles, propertyId, 'comps');
+        // If this was first, capture ID
+        if (propertyId === 'new') {
+          // This case shouldn't happen if we ran MLS first, but if MLS empty:
+          // logic above needs capture. 
+          // Actually uploadPDF returns response object.
+          // Let's refactor slightly to be robust.
+        }
+      }
+
+      // Need to capture ID if only comps uploaded
+      // But let's simplify: 
+
+      const uploadSequence = async () => {
+        let currentPropId = 'new';
+
+        if (mlsFiles.length > 0) {
+          const res = await api.uploadPDF(mlsFiles, currentPropId, 'mls');
+          currentPropId = res.property_id;
+        }
+
+        if (compFiles.length > 0) {
+          const res = await api.uploadPDF(compFiles, currentPropId, 'comps');
+          currentPropId = res.property_id;
+        }
+
+        return currentPropId;
+      };
+
+      const finalPropertyId = await uploadSequence();
+
+      toast.success("Project initialized successfully");
+      setLocation(`/organize/${finalPropertyId}`);
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed");
+      console.error(error);
     } finally {
       setIsSubmitting(false);
     }
@@ -63,7 +114,7 @@ export default function ProjectSetupPage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center text-white font-bold text-xs">
-              A
+            A
           </div>
           <span className="font-medium tracking-wide text-sm">DESIGN AI WORKSPACE</span>
         </div>
@@ -79,77 +130,132 @@ export default function ProjectSetupPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="w-full max-w-xl space-y-8">
-          
+
           <div className="space-y-3">
-             <div className="flex justify-between items-center">
-                <Label className="architectural-label">MLS URL / Listing PDF</Label>
-             </div>
-             <input 
-               type="file" 
-               ref={mlsInputRef}
-               onChange={handleMlsUpload}
-               accept=".pdf,.jpg,.jpeg,.png"
-               multiple
-               className="hidden"
-               data-testid="input-mls-file"
-             />
-             <div 
-               onClick={() => mlsInputRef.current?.click()}
-               className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group"
-               data-testid="dropzone-mls"
-             >
+            <div className="flex justify-between items-center">
+              <Label className="architectural-label">MLS URL / Listing PDF</Label>
+              {mlsFiles.length > 0 && <span className="text-xs text-primary">{mlsFiles.length} file(s)</span>}
+            </div>
+            <input
+              type="file"
+              ref={mlsInputRef}
+              onChange={handleMlsUpload}
+              accept=".pdf"
+              multiple
+              className="hidden"
+              data-testid="input-mls-file"
+            />
+
+            {mlsFiles.length > 0 ? (
+              <div className="space-y-2">
+                {mlsFiles.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-white border border-border rounded-xl shadow-sm">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <FileText className="w-4 h-4 text-primary" />
+                      <span className="text-sm truncate">{file.name}</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => removeMlsFile(i, e)}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={() => mlsInputRef.current?.click()}
+                >
+                  Add another file
+                </Button>
+              </div>
+            ) : (
+              <div
+                onClick={() => mlsInputRef.current?.click()}
+                className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group"
+                data-testid="dropzone-mls"
+              >
                 <div className="w-10 h-10 rounded-full bg-white border border-border flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                   <FileText className="w-4 h-4 text-muted-foreground" />
+                  <FileText className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {mlsFiles.length > 0 ? `${mlsFiles.length} file(s) selected` : "Select or drop file"}
+                  Select Subject Property PDF
                 </span>
-             </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
-             <div className="flex justify-between items-center">
-                <Label className="architectural-label">Comp PDFS / References</Label>
-             </div>
-             <input 
-               type="file" 
-               ref={compInputRef}
-               onChange={handleCompUpload}
-               accept=".pdf,.jpg,.jpeg,.png"
-               multiple
-               className="hidden"
-               data-testid="input-comp-file"
-             />
-             <div 
-               onClick={() => compInputRef.current?.click()}
-               className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group"
-               data-testid="dropzone-comp"
-             >
+            <div className="flex justify-between items-center">
+              <Label className="architectural-label">Comp PDFS / References</Label>
+              {compFiles.length > 0 && <span className="text-xs text-primary">{compFiles.length} file(s)</span>}
+            </div>
+            <input
+              type="file"
+              ref={compInputRef}
+              onChange={handleCompUpload}
+              accept=".pdf"
+              multiple
+              className="hidden"
+              data-testid="input-comp-file"
+            />
+
+            {compFiles.length > 0 ? (
+              <div className="space-y-2">
+                {compFiles.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-white border border-border rounded-xl shadow-sm">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <Upload className="w-4 h-4 text-primary" />
+                      <span className="text-sm truncate">{file.name}</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => removeCompFile(i, e)}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={() => compInputRef.current?.click()}
+                >
+                  Add another file
+                </Button>
+              </div>
+            ) : (
+              <div
+                onClick={() => compInputRef.current?.click()}
+                className="h-32 border border-dashed border-border rounded-xl bg-secondary/20 hover:bg-secondary/40 hover:border-primary/30 transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 group"
+                data-testid="dropzone-comp"
+              >
                 <div className="w-10 h-10 rounded-full bg-white border border-border flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                   <Upload className="w-4 h-4 text-muted-foreground" />
+                  <Upload className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {compFiles.length > 0 ? `${compFiles.length} file(s) selected` : "Add Reference Material"}
+                  Add Comparable Properties
                 </span>
-             </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
-             <Label className="architectural-label">Optional Notes</Label>
-             <Textarea 
-                placeholder="Add specific instructions or client preferences..." 
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="architectural-input min-h-[120px] resize-none text-sm"
-                data-testid="input-notes"
-             />
+            <Label className="architectural-label">Optional Notes</Label>
+            <Textarea
+              placeholder="Add specific instructions or client preferences..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="architectural-input min-h-[120px] resize-none text-sm"
+              data-testid="input-notes"
+            />
           </div>
 
           <div className="pt-4 flex justify-center">
-            <Button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="w-48 h-12 rounded-full bg-primary text-primary-foreground font-medium text-xs uppercase tracking-widest hover:bg-primary/90 shadow-lg"
+            <Button
+              type="submit"
+              disabled={isSubmitting || (mlsFiles.length === 0 && compFiles.length === 0)}
+              className="w-48 h-12 rounded-full bg-primary text-primary-foreground font-medium text-xs uppercase tracking-widest hover:bg-primary/90 shadow-lg transition-all hover:translate-y-[-1px]"
+              data-testid="button-import"
             >
               {isSubmitting ? (
                 <>

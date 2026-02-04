@@ -1,78 +1,62 @@
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Clock } from "lucide-react";
 import { Link } from "wouter";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, MapPin, Image as ImageIcon } from "lucide-react";
 
 interface ProjectCardProps {
   id: string;
   title: string;
   location: string;
-  status: "In Progress" | "Completed" | "Planning";
-  image: string;
-  timeline?: string;
-  roi?: string;
-  completion?: number;
+  status: "Planning" | "In Progress" | "Completed";
+  image?: string;
 }
 
-export function ProjectCard({ id, title, location, status, image, timeline, roi, completion }: ProjectCardProps) {
+export function ProjectCard({ id, title, location, status, image }: ProjectCardProps) {
+  const statusColors = {
+    "Planning": "bg-blue-500/10 text-blue-700 border-blue-200",
+    "In Progress": "bg-amber-500/10 text-amber-700 border-amber-200",
+    "Completed": "bg-emerald-500/10 text-emerald-700 border-emerald-200"
+  };
+
   return (
-    <div className="group architectural-card overflow-hidden flex flex-col h-full bg-card">
-      {/* Image Container */}
-      <div className="relative aspect-[4/3] overflow-hidden border-b border-border">
-        <img 
-          src={image} 
-          alt={title} 
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-        />
-        <div className="absolute top-4 left-4">
-          <Badge 
-            variant="secondary" 
-            className="rounded-sm bg-white/90 backdrop-blur-md border-none text-primary uppercase text-[10px] tracking-widest font-bold px-2 py-1 shadow-sm"
-          >
-            {status}
-          </Badge>
-        </div>
-        
-        {/* Overlay on Hover */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
-      </div>
-
-      {/* Content */}
-      <div className="p-5 flex-1 flex flex-col justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-primary mb-1">{title}</h3>
-          <p className="text-muted-foreground text-xs uppercase tracking-widest mb-4">{location}</p>
+    <Link href={`/studio/${id}`}>
+      <div className="group h-full rounded-2xl border border-border bg-card overflow-hidden hover:shadow-2xl hover:border-primary/20 transition-all duration-500 cursor-pointer">
+        <div className="relative h-[280px] overflow-hidden bg-muted">
+          {image ? (
+            <img
+              src={image}
+              alt={title}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+              <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
+            </div>
+          )}
+          <div className="absolute top-4 right-4">
+            <Badge className={`${statusColors[status]} border backdrop-blur-sm font-medium text-[10px] uppercase tracking-wider px-3 py-1`}>
+              {status}
+            </Badge>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs border-t border-border pt-4">
-            {timeline && (
-              <div className="flex flex-col">
-                <span className="architectural-label mb-1">Timeline</span>
-                <span className="font-medium text-primary">{timeline}</span>
-              </div>
-            )}
-            {roi && (
-              <div className="flex flex-col text-right">
-                <span className="architectural-label mb-1">ROI</span>
-                <span className="font-medium text-emerald-600">{roi}</span>
-              </div>
-            )}
-             {status === "Planning" && (
-              <div className="flex flex-col text-right w-full">
-                <span className="architectural-label mb-1">Drafts</span>
-                <span className="font-medium text-primary">4 Ready</span>
-              </div>
-            )}
+        <div className="p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-medium text-primary mb-2 group-hover:text-primary/80 transition-colors">{title}</h3>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{location}</span>
+            </div>
           </div>
 
-          <Link href={`/studio/${id}`}>
-            <a className="w-full flex items-center justify-center gap-2 py-2.5 bg-secondary hover:bg-primary hover:text-white rounded-lg text-xs font-medium uppercase tracking-wider transition-all duration-200 group-hover:bg-primary group-hover:text-white">
-              Open Workspace
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
-          </Link>
+          <div className="pt-3 border-t border-border flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3 h-3" />
+              <span>Updated Today</span>
+            </div>
+            <span className="text-primary font-bold">View →</span>
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
