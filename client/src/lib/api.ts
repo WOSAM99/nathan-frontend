@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "https://046efa4d0b1b.ngrok-free.app";
 
 interface AuthTokens {
   access_token: string;
@@ -25,11 +26,18 @@ interface User {
 
 interface Project {
   property_id: string;
-  user_id: string;
-  created_at: string;
-  total_images: number;
+  user_id?: string;
+  created_at?: string;
+  total_images?: number;
   thumbnail_url?: string;
-  pdf_urls: string[];
+  pdf_urls?: string[];
+  project_address?: string;
+  days_left?: number;
+  roi_percent?: number;
+  drafts_ready?: number;
+  city?: string;
+  state?: string;
+  status?:string
 }
 
 interface PropertyImage {
@@ -88,14 +96,14 @@ class ApiClient {
   private refreshToken: string | null = null;
 
   constructor() {
-    this.accessToken = localStorage.getItem('access_token');
-    this.refreshToken = localStorage.getItem('refresh_token');
+    this.accessToken = localStorage.getItem("access_token");
+    this.refreshToken = localStorage.getItem("refresh_token");
   }
 
   private unwrapResponse<T>(response: any): T {
     // Backend wraps responses in {success, data, message}
     if (response.success === false) {
-      throw new Error(response.message || 'API Error');
+      throw new Error(response.message || "API Error");
     }
     // Return data field if it exists, otherwise return response as-is
     return (response.data !== undefined ? response.data : response) as T;
@@ -103,20 +111,15 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     // Always get fresh tokens from localStorage
-    this.accessToken = localStorage.getItem('access_token');
-    this.refreshToken = localStorage.getItem('refresh_token');
-
-    console.log(`[API] ${options.method || 'GET'} ${endpoint}`, {
-      hasAccessToken: !!this.accessToken,
-      tokenPreview: this.accessToken?.substring(0, 20) + '...'
-    });
+    this.accessToken = localStorage.getItem("access_token");
+    this.refreshToken = localStorage.getItem("refresh_token");
 
     // Create headers object with proper typing
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     // Merge any existing headers from options
@@ -126,8 +129,11 @@ class ApiClient {
 
     // Add Authorization header if token exists
     if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-      console.log(`[API] Authorization header set:`, headers['Authorization'].substring(0, 30) + '...');
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+      console.log(
+        `[API] Authorization header set:`,
+        headers["Authorization"].substring(0, 30) + "...",
+      );
     } else {
       console.warn(`[API] No access token available for ${endpoint}`);
     }
@@ -135,13 +141,15 @@ class ApiClient {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
-      credentials: 'include', // Include cookies for refresh token
+      credentials: "include", // Include cookies for refresh token
     });
 
     // Don't automatically refresh on 401 - let the error propagate
     // Only refresh when we get a specific "token expired" error
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Unknown error" }));
       console.error(`[API] Error ${response.status}:`, error.message);
       // Backend uses 'message' field for errors, not 'detail'
       throw new Error(error.message || `API Error: ${response.status}`);
@@ -154,9 +162,9 @@ class ApiClient {
   private async refreshTokens(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Send HttpOnly cookie automatically
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Send HttpOnly cookie automatically
         // No body - backend uses cookie
       });
 
@@ -178,15 +186,15 @@ class ApiClient {
   setTokens(tokens: AuthTokens) {
     this.accessToken = tokens.access_token;
     this.refreshToken = tokens.refresh_token;
-    localStorage.setItem('access_token', tokens.access_token);
-    localStorage.setItem('refresh_token', tokens.refresh_token);
+    localStorage.setItem("access_token", tokens.access_token);
+    localStorage.setItem("refresh_token", tokens.refresh_token);
   }
 
   clearTokens() {
     this.accessToken = null;
     this.refreshToken = null;
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
   }
 
   isAuthenticated(): boolean {
@@ -194,43 +202,45 @@ class ApiClient {
   }
 
   async login(data: LoginRequest): Promise<AuthTokens> {
-    const tokens = await this.request<AuthTokens>('/auth/login', {
-      method: 'POST',
+    const tokens = await this.request<AuthTokens>("/auth/login", {
+      method: "POST",
       body: JSON.stringify(data),
     });
-    console.log('Login response tokens:', tokens);
+    console.log("Login response tokens:", tokens);
     this.setTokens(tokens);
     return tokens;
   }
 
   async register(data: RegisterRequest): Promise<AuthTokens> {
-    const tokens = await this.request<AuthTokens>('/auth/register', {
-      method: 'POST',
+    const tokens = await this.request<AuthTokens>("/auth/register", {
+      method: "POST",
       body: JSON.stringify(data),
     });
-    console.log('Register response tokens:', tokens);
+    console.log("Register response tokens:", tokens);
     this.setTokens(tokens);
     return tokens;
   }
 
   async logout(): Promise<void> {
     try {
-      await this.request('/auth/logout', { method: 'POST' });
+      await this.request("/auth/logout", { method: "POST" });
     } finally {
       this.clearTokens();
     }
   }
 
   async getProjects(): Promise<Project[]> {
-    const response = await this.request<any[]>('/doc/projects');
+    const response = await this.request<any[]>("/doc/projects");
     // Map backend PropertyData to frontend Project interface
-    return response.map(p => ({
+    return response.map((p) => ({
       property_id: p.property_id,
       user_id: p.user_id,
       created_at: p.created_at,
       total_images: (p.files || []).length, // Fallback for list view
-      thumbnail_url: p.files?.[0]?.id ? this.getImageUrl(p.files[0].id) : undefined,
-      pdf_urls: p.pdf_urls || []
+      thumbnail_url: p.files?.[0]?.id
+        ? this.getImageUrl(p.files[0].id)
+        : undefined,
+      pdf_urls: p.pdf_urls || [],
     }));
   }
 
@@ -238,33 +248,43 @@ class ApiClient {
     return this.request<PropertyDetails>(`/doc/${propertyId}`);
   }
 
-  async uploadPDF(files: File[], propertyId: string, fileType: 'mls' | 'comps' = 'mls'): Promise<{ success: boolean; message: string; property_id: string }> {
+  async uploadPDF(
+    files: File[],
+    propertyId: string,
+    fileType: "mls" | "comps" = "mls",
+  ): Promise<{ success: boolean; message: string; property_id: string }> {
     // Always get fresh token from localStorage
-    this.accessToken = localStorage.getItem('access_token');
+    this.accessToken = localStorage.getItem("access_token");
 
     const formData = new FormData();
     // Always send property_id (generate UUID if new)
-    const actualPropertyId = propertyId === 'new'
-      ? crypto.randomUUID()
-      : propertyId;
-    formData.append('property_id', actualPropertyId);
-    formData.append('file_type', fileType);
+    const actualPropertyId =
+      propertyId === "new" ? crypto.randomUUID() : propertyId;
+    formData.append("property_id", actualPropertyId);
+    formData.append("file_type", fileType);
 
-    files.forEach(file => formData.append('files', file));
+    files.forEach((file) => formData.append("files", file));
 
     const response = await fetch(`${API_BASE_URL}/doc/upload`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
+        Authorization: `Bearer ${this.accessToken}`,
         // Content-Type not set for FormData
       },
-      credentials: 'include',
+      credentials: "include",
       body: formData,
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-      throw new Error(error.message);
+      let message = "Upload failed";
+
+      try {
+        const error = await response.json();
+        message = error.message || message;
+      } catch {}
+
+      console.error(`[UPLOAD ERROR]`, message);
+      throw new Error(message);
     }
 
     const json = await response.json();
@@ -272,26 +292,37 @@ class ApiClient {
 
     return {
       success: true,
-      message: unwrapped.message || 'Upload successful',
-      property_id: unwrapped.property_id
+      message: unwrapped.message || "Upload successful",
+      property_id: unwrapped.property_id,
     };
   }
 
   // Alias for backward compatibility if needed, but updated signature is better
-  async uploadDocument(propertyId: string, files: File[], notes?: string, fileType: 'mls' | 'comps' = 'mls'): Promise<{ success: boolean; message: string; property_id: string }> {
+  async uploadDocument(
+    propertyId: string,
+    files: File[],
+    notes?: string,
+    fileType: "mls" | "comps" = "mls",
+  ): Promise<{ success: boolean; message: string; property_id: string }> {
     return this.uploadPDF(files, propertyId, fileType);
   }
 
-  async updateImageCategory(propertyId: string, imageId: string, category: string): Promise<any> {
+  async updateImageCategory(
+    propertyId: string,
+    imageId: string,
+    category: string,
+  ): Promise<any> {
     return this.request(`/doc/image/${propertyId}/${imageId}/category`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({ category }),
     });
   }
 
-  async regenerateDesign(data: ChatRegenerateRequest): Promise<ChatRegenerateResponse> {
-    return this.request<ChatRegenerateResponse>('/chat/regenerate', {
-      method: 'POST',
+  async regenerateDesign(
+    data: ChatRegenerateRequest,
+  ): Promise<ChatRegenerateResponse> {
+    return this.request<ChatRegenerateResponse>("/chat/regenerate", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }

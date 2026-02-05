@@ -5,7 +5,7 @@ import { Send, Bot, Sparkles, Paperclip, Mic, MicOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { toast } from "sonner";
+import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 
 interface SpeechRecognitionResult {
   readonly isFinal: boolean;
@@ -41,8 +41,12 @@ interface ISpeechRecognition extends EventTarget {
   lang: string;
   onstart: ((this: ISpeechRecognition, ev: Event) => void) | null;
   onend: ((this: ISpeechRecognition, ev: Event) => void) | null;
-  onerror: ((this: ISpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
-  onresult: ((this: ISpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onerror:
+    | ((this: ISpeechRecognition, ev: SpeechRecognitionErrorEvent) => void)
+    | null;
+  onresult:
+    | ((this: ISpeechRecognition, ev: SpeechRecognitionEvent) => void)
+    | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -64,7 +68,7 @@ function GeneratingIndicator({ progress }: { progress: number }) {
     { threshold: 95, label: "Almost done..." },
   ];
 
-  const currentStage = stages.filter(s => progress >= s.threshold).pop();
+  const currentStage = stages.filter((s) => progress >= s.threshold).pop();
 
   return (
     <div className="flex gap-3">
@@ -74,8 +78,12 @@ function GeneratingIndicator({ progress }: { progress: number }) {
       <div className="bg-white border border-border p-4 rounded-2xl rounded-tl-none shadow-sm min-w-[200px]">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">{currentStage?.label}</span>
-            <span className="text-[10px] font-medium text-primary">{progress}%</span>
+            <span className="text-xs text-muted-foreground">
+              {currentStage?.label}
+            </span>
+            <span className="text-[10px] font-medium text-primary">
+              {progress}%
+            </span>
           </div>
           <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
             <div
@@ -85,7 +93,9 @@ function GeneratingIndicator({ progress }: { progress: number }) {
           </div>
           <div className="flex items-center gap-1.5 pt-1">
             <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-            <span className="text-[10px] text-amber-600 font-medium">AI is working</span>
+            <span className="text-[10px] text-amber-600 font-medium">
+              AI is working
+            </span>
           </div>
         </div>
       </div>
@@ -99,9 +109,12 @@ function EmptyState() {
       <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
         <Sparkles className="w-8 h-8 text-primary/40" />
       </div>
-      <h3 className="text-sm font-medium text-primary mb-2">Start a Conversation</h3>
+      <h3 className="text-sm font-medium text-primary mb-2">
+        Start a Conversation
+      </h3>
       <p className="text-xs text-muted-foreground max-w-[240px]">
-        Select images from the MLS or Comps sections and describe changes to generate new designs.
+        Select images from the MLS or Comps sections and describe changes to
+        generate new designs.
       </p>
     </div>
   );
@@ -110,10 +123,20 @@ function EmptyState() {
 interface ChatInterfaceProps {
   propertyId?: string;
   referenceImages?: string[];
-  onIterationGenerated?: (iteration: { id: string; image_url: string; version: string }) => void;
+  onIterationGenerated?: (iteration: {
+    id: string;
+    image_url: string;
+    version: string;
+  }) => void;
 }
 
-export function ChatInterface({ propertyId, referenceImages = [], onIterationGenerated }: ChatInterfaceProps) {
+export function ChatInterface({
+  propertyId,
+  referenceImages = [],
+  onIterationGenerated,
+}: ChatInterfaceProps) {
+  const { showSnackbar } = useAppSnackbar();
+
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -124,10 +147,13 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const startListening = () => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognitionAPI =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognitionAPI) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+      alert(
+        "Speech recognition is not supported in this browser. Please use Chrome.",
+      );
       return;
     }
 
@@ -140,14 +166,14 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = "en-US";
 
     recognition.onstart = () => {
       setIsListening(true);
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = '';
+      let transcript = "";
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
@@ -155,7 +181,7 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
+      console.error("Speech recognition error:", event.error);
       setIsListening(false);
     };
 
@@ -167,12 +193,14 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
     recognition.start();
   };
 
-  const [messages, setMessages] = useState<Array<{
-    id: number;
-    role: "assistant" | "user";
-    content: string;
-    image?: string;
-  }>>([]);
+  const [messages, setMessages] = useState<
+    Array<{
+      id: number;
+      role: "assistant" | "user";
+      content: string;
+      image?: string;
+    }>
+  >([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -182,16 +210,15 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
     scrollToBottom();
   }, [messages, isTyping]);
 
-
   const handleSubmit = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage = {
       id: messages.length + 1,
       role: "user" as const,
-      content: inputValue
+      content: inputValue,
     };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
 
     const prompt = inputValue;
     setInputValue("");
@@ -234,9 +261,9 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
             id: messages.length + 2,
             role: "assistant" as const,
             content: result.description || result.message,
-            image: result.regenerated_images[0]?.url
+            image: result.regenerated_images[0]?.url,
           };
-          setMessages(prev => [...prev, aiMessage]);
+          setMessages((prev) => [...prev, aiMessage]);
 
           if (onIterationGenerated && result.regenerated_images[0]) {
             onIterationGenerated({
@@ -255,7 +282,7 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
         setIsTyping(false);
 
         if (!propertyId) {
-          toast.error("No property context found.");
+          showSnackbar("No property context found.", "error");
           return;
         }
 
@@ -265,9 +292,10 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
           const warningMsg = {
             id: messages.length + 2,
             role: "assistant" as const,
-            content: "Please select at least one MLS or Comp image to use as reference before generating."
+            content:
+              "Please select at least one MLS or Comp image to use as reference before generating.",
           };
-          setMessages(prev => [...prev, warningMsg]);
+          setMessages((prev) => [...prev, warningMsg]);
           return;
         }
       }
@@ -277,30 +305,49 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
       }
       setIsTyping(false);
       setGenerationProgress(0);
-      toast.error(error instanceof Error ? error.message : "Failed to generate design");
+      showSnackbar(
+        error instanceof Error ? error.message : "Failed to generate design",
+        "error",
+      );
 
       const errorMessage = {
         id: messages.length + 2,
         role: "assistant" as const,
-        content: "I apologize, but I encountered an error generating the design. Please try again."
+        content:
+          "I apologize, but I encountered an error generating the design. Please try again.",
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       handleSubmit();
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden" role="region" aria-label="Design chat interface">
+    <div
+      className="flex flex-col h-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
+      role="region"
+      aria-label="Design chat interface"
+    >
       <div className="p-4 border-b border-border flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
-          <div className={cn("w-2 h-2 rounded-full", isTyping ? "bg-amber-500 animate-pulse" : "bg-emerald-500 animate-pulse")} />
+          <div
+            className={cn(
+              "w-2 h-2 rounded-full",
+              isTyping
+                ? "bg-amber-500 animate-pulse"
+                : "bg-emerald-500 animate-pulse",
+            )}
+          />
           <h3 className="architectural-label text-primary">Design Agent</h3>
-          {isTyping && <span className="text-[10px] text-amber-600 font-medium">Generating...</span>}
+          {isTyping && (
+            <span className="text-[10px] text-amber-600 font-medium">
+              Generating...
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {referenceImages.length > 0 && (
@@ -308,7 +355,10 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
               {referenceImages.length} refs
             </span>
           )}
-          <button className="text-[10px] text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1" aria-label="View chat history">
+          <button
+            className="text-[10px] text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+            aria-label="View chat history"
+          >
             History
           </button>
         </div>
@@ -320,22 +370,41 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
         ) : (
           <div className="space-y-6" role="log" aria-live="polite">
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "assistant" ? "bg-white border border-border text-accent shadow-sm" : "bg-primary text-white"}`} aria-hidden="true">
-                  {msg.role === "assistant" ? <Bot className="w-4 h-4" /> : <div className="text-xs font-bold">JD</div>}
+              <div
+                key={msg.id}
+                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === "assistant" ? "bg-white border border-border text-accent shadow-sm" : "bg-primary text-white"}`}
+                  aria-hidden="true"
+                >
+                  {msg.role === "assistant" ? (
+                    <Bot className="w-4 h-4" />
+                  ) : (
+                    <div className="text-xs font-bold">JD</div>
+                  )}
                 </div>
 
-                <div className={`flex flex-col gap-2 max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                  <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.role === "assistant"
-                    ? "bg-white border border-border text-primary rounded-tl-none"
-                    : "bg-primary text-primary-foreground rounded-tr-none"
-                    }`}>
+                <div
+                  className={`flex flex-col gap-2 max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}
+                >
+                  <div
+                    className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                      msg.role === "assistant"
+                        ? "bg-white border border-border text-primary rounded-tl-none"
+                        : "bg-primary text-primary-foreground rounded-tr-none"
+                    }`}
+                  >
                     {msg.content}
                   </div>
 
                   {msg.image && (
                     <div className="rounded-xl overflow-hidden border border-border shadow-sm w-full max-w-[240px]">
-                      <img src={msg.image} alt="Render result" className="w-full h-auto" />
+                      <img
+                        src={msg.image}
+                        alt="Render result"
+                        className="w-full h-auto"
+                      />
                     </div>
                   )}
                 </div>
@@ -354,9 +423,13 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
               <Input
                 className={cn(
                   "pr-20 h-12 rounded-xl bg-background border-border shadow-inner text-sm focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                  isListening && "border-red-400 ring-2 ring-red-400/20"
+                  isListening && "border-red-400 ring-2 ring-red-400/20",
                 )}
-                placeholder={isListening ? "Listening..." : "Direct the AI to refine the design..."}
+                placeholder={
+                  isListening
+                    ? "Listening..."
+                    : "Direct the AI to refine the design..."
+                }
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -381,14 +454,20 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
                     "h-8 w-8 rounded-full transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-1",
                     isListening
                       ? "bg-red-500 text-white hover:bg-red-600"
-                      : "text-muted-foreground hover:text-primary"
+                      : "text-muted-foreground hover:text-primary",
                   )}
                   onClick={startListening}
                   data-testid="button-mic"
-                  aria-label={isListening ? "Stop listening" : "Start voice input"}
+                  aria-label={
+                    isListening ? "Stop listening" : "Start voice input"
+                  }
                   aria-pressed={isListening}
                 >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {isListening ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -403,7 +482,9 @@ export function ChatInterface({ propertyId, referenceImages = [], onIterationGen
             </Button>
           </div>
           <div className="text-center mt-3">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">Press CMD + Enter to Submit</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">
+              Press CMD + Enter to Submit
+            </span>
           </div>
         </div>
       </div>
