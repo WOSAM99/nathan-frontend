@@ -8,7 +8,8 @@ interface AppNavbarProps {
   showNewProject?: boolean;
   showBack?: boolean;
   onBack?: () => void;  
-  isFromProjectSetupPage?: boolean;
+  propertyId?: string; 
+  bgcolor?:string
 }
 
 export default function AppNavbar({
@@ -16,7 +17,8 @@ export default function AppNavbar({
   showNewProject = false,
   showBack = false,      
   onBack,
-  isFromProjectSetupPage = false
+  propertyId,    
+  bgcolor        
 }: AppNavbarProps) {
   const [, setLocation] = useLocation();
 
@@ -31,48 +33,73 @@ export default function AppNavbar({
 
   return (
     <Box
-  sx={{
-    width: "100%", 
-    mx: "auto",
-    px: { xs: 2, sm: 4 },
-    py: 2,
-    minHeight: 64,
-    display: "grid",
-    gridTemplateColumns: "auto 1fr auto",
-    alignItems: "center",
-    bgcolor: "#fff",
-  }}
->
-      {/* LEFT: Always same */}
+      sx={{
+        width: "100%", 
+        mx: "auto",
+        px: { xs: 2, sm: 4 },
+        py: 2,
+        minHeight: 64,
+        display: "grid",
+        gridTemplateColumns: "auto 1fr auto",
+        alignItems: "center",
+        bgcolor: bgcolor || "#fff",
+        borderBottom: "1px solid #E5E7EB",
+      }}
+    >
+      {/* ================= LEFT SIDE ================= */}
       <Box display="flex" alignItems="center" gap={1.5}>
 
-        {/* LEFT: LOGO + (OPTIONAL) BACK BUTTON + TITLE */}
-    
         {showBack && (
           <IconButton size="small" onClick={handleBack}>
             <ArrowBackIosNewOutlinedIcon fontSize="small" />
           </IconButton>
         )}
 
-        <Box
-          sx={{
-            width: 22,
-            height: 22,
-            bgcolor: "#0b1320",
-            borderRadius: 1,
-          }}
-        />
-        <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
-          DESIGN AI WORKSPACE
-        </Typography>
+        {propertyId ? (
+          <Box display="flex" gap={6}>
+            {/* SUBJECT PROPERTY */}
+            <Box>
+              <Typography
+                sx={{
+                  fontSize: "12px",
+                  letterSpacing: 1,
+                  fontWeight: 600,
+                  color: "#111827",
+                  textTransform: "uppercase",
+                }}
+              >
+                SUBJECT PROPERTY
+              </Typography>
+              <Typography sx={{ fontSize: "12px", color: "#6B7280",letterSpacing: 1, }}>
+                Organization Utility
+              </Typography>
+            </Box>
+
+            
+          </Box>
+        ) : (
+          <>
+            <Box
+              sx={{
+                width: 22,
+                height: 22,
+                bgcolor: "#0b1320",
+                borderRadius: 1,
+              }}
+            />
+            <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
+              DESIGN AI WORKSPACE
+            </Typography>
+          </>
+        )}
       </Box>
 
-      {/* CENTER: DIFFERENT PER PAGE */}
+      {/* ================= CENTER ================= */}
       <Box display="flex" justifyContent="center">
         {centerContent}
       </Box>
 
-      {/* RIGHT */}
+      {/* ================= RIGHT SIDE ================= */}
       <Box display="flex" alignItems="center" gap={2} justifyContent="flex-end">
         {showNewProject && (
           <Button
@@ -87,12 +114,7 @@ export default function AppNavbar({
           >
             + NEW PROJECT
           </Button>
-        )}{
-            isFromProjectSetupPage && ( <Typography sx={{ fontSize: 12, letterSpacing: 1, color: "#888" }}>
-            DRAFT PROJECT V1.0
-          </Typography>)
-        }
-
+        )}
         <ProfileMenu />
       </Box>
     </Box>

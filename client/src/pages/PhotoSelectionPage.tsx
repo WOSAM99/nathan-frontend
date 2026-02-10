@@ -1,530 +1,395 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { useLocation, useParams } from "wouter";
+import { useState, useEffect, useCallback } from "react";
 import {
-  ArrowRight,
-  Check,
-  Search,
-  Wand2,
-  Armchair,
-  BedDouble,
-  Bath,
-  Home,
-  HelpCircle,
-  MoreHorizontal,
-  FolderInput,
-  Loader2
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { api, PropertyDetails } from "@/lib/api";
-import { useAppSnackbar } from "@/hooks/useAppSnackbar";
+  Box,
+  Typography,
+  Button,
+  Grid,
+  Card,
+  CardMedia,
+  IconButton,
+  Menu,
+  MenuItem,
+  Paper,
+  Backdrop,
+  CircularProgress,
+} from "@mui/material";
 
-const categories = [
-  { id: "kitchen", label: "Kitchen", icon: Home },
-  { id: "living", label: "Living Room", icon: Armchair },
-  { id: "bedrooms", label: "Bedrooms", icon: BedDouble },
-  { id: "bathrooms", label: "Bathrooms", icon: Bath },
-  { id: "exterior", label: "Exterior", icon: Home },
-  { id: "uncategorized", label: "Uncategorized", icon: HelpCircle },
-];
+import { MoreHoriz, Check, ArrowForward } from "@mui/icons-material";
+import { useLocation, useParams } from "wouter";
+import { api } from "@/lib/api";
+import { useAppSnackbar } from "@/hooks/useAppSnackbar";
+import AppNavbar from "@/components/AppNavBar";
+import { useAuth } from "@/contexts/AuthContext";
+
+/* ===== DESIGN TOKENS ===== */
+const ui = {
+  bg: "#F8F9FA",
+  white: "#FFFFFF",
+  border: "#E5E7EB",
+  muted: "#6B7280",
+  text: "#111827",
+  primary: "#0F172A",
+  blue: "#2563EB",
+  sidebarBg: "#FFFFFF",
+  cardRadius: 4,
+};
 
 interface Photo {
   id: string;
   src: string;
-  category: string;
+  rawCategory: string;
+  roomCategory: string;
   selected: boolean;
   filename: string;
-  customCategoryInput?: string; // For editing custom category
 }
 
 export default function PhotoSelectionPage() {
   const { showSnackbar } = useAppSnackbar();
-
   const params = useParams();
   const propertyId = params.id || "";
+  const { userId } = useAuth();
   const [, setLocation] = useLocation();
+
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("uncategorized");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activePhoto, setActivePhoto] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!propertyId || !userId) {
+      setLoading(false);
+      return;
+    }
     loadPropertyImages();
-  }, [propertyId]);
+  }, [propertyId, userId]);
 
-  const loadPropertyImages = async () => {
+  const loadPropertyImages = useCallback(async () => {
+    if (!propertyId || !userId) return;
     try {
-      const details = await api.getPropertyDetails(propertyId);
-      // New API structure returns mls_images and comps_images
-      // We only want MLS images for categorization
-      const mlsImages = details.mls_images || [];
+      if (userId && propertyId) {
+        const details = await api.getPropertyDetails(propertyId, userId);
+        const mlsImages = details?.images || [];
 
-      const loadedPhotos = mlsImages.map((file) => ({
-        id: file.id,
-        src: api.getImageUrl(file.id),
-        category: file.category || "uncategorized",
-        selected: false,
-        filename: file.filename,
-      }));
-      setPhotos(loadedPhotos);
+        const loadedPhotos = mlsImages?.map((file: any) => {
+          const roomCategory =
+            file.category && file.category.includes("-")
+              ? file.category.split("-").slice(1).join("-").trim()
+              : file.category || "Unknown";
+
+          return {
+            id: file?.id,
+            src: file?.url,
+            rawCategory: file?.category || "Unknown",
+            roomCategory,
+            selected: false,
+            filename: file?.filename,
+          };
+        });
+
+        setPhotos(loadedPhotos);
+
+        // Set first category as default selection
+        const firstCategory = loadedPhotos?.find(
+          (p) => p.roomCategory.toLowerCase() !== "unknown",
+        )?.roomCategory;
+
+        if (firstCategory) setSelectedCategory(firstCategory);
+      }
     } catch (error) {
       showSnackbar("Failed to load images", "error");
-      console.error(error);
     } finally {
       setLoading(false);
     }
+  }, [propertyId, userId, showSnackbar]);
+
+  const categoryData = Array.from(
+    new Set(photos.map((p) => p.roomCategory || "Unknown")),
+  );
+
+  const dynamicCategories = categoryData?.map((cat) => ({
+    id: cat.toLowerCase().replace(/\s+/g, "_"),
+    label: cat,
+    count: photos.filter((p) => p.roomCategory === cat).length,
+  }));
+
+  // --------- FILTER PHOTOS ----------
+  const filteredPhotos = photos?.filter(
+    (p) => p.roomCategory === selectedCategory,
+  );
+
+  const toggleSelection = (id: string) => {
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)),
+    );
   };
 
-  const filteredPhotos = photos.filter((p) => p.category === selectedCategory);
-  const selectedPhotos = photos.filter((p) => p.selected);
-  const selectedCount = selectedPhotos.length;
+  const moveSinglePhoto = async (id: string, newRoom: string) => {
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, roomCategory: newRoom } : p)),
+    );
+
+    try {
+      await api.updateImageCategory(propertyId, id, newRoom, String(userId));
+      showSnackbar("Image moved", "success");
+    } catch {
+      showSnackbar("Failed to move image", "error");
+      loadPropertyImages();
+    }
+  };
 
   const handleContinue = () => {
-    // Navigate to the studio page for this property
     setLocation(`/studio/${propertyId}`);
   };
 
-  const toggleSelection = (id: string) => {
-    setPhotos(
-      photos.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)),
-    );
-  };
-
-  const moveSelectedPhotos = async (targetCategory: string) => {
-    // Optimistic update
-    setPhotos(
-      photos.map((p) =>
-        p.selected ? { ...p, category: targetCategory, selected: false } : p,
-      ),
-    );
-
-    // Persist changes
-    const photosToUpdate = selectedPhotos;
-    let failedCount = 0;
-
-    // Process in parallel (limit concurrency?) or sequential?
-    // Sequential for safety or parallel for speed. Parallel allows faster feedback.
-    await Promise.all(
-      photosToUpdate.map(async (photo) => {
-        try {
-          await api.updateImageCategory(propertyId, photo.id, targetCategory);
-        } catch (err) {
-          console.error(`Failed to update category for ${photo.id}`, err);
-          failedCount++;
-        }
-      }),
-    );
-
-    if (failedCount > 0) {
-      showSnackbar(`Failed to save changes for ${failedCount} images`, "error");
-      // Ideally revert changes here, but simple refresh is easier fallback
-      loadPropertyImages();
-    } else {
-      showSnackbar(
-        `Moved ${selectedCount} images to ${categories.find((c) => c.id === targetCategory)?.label}`,
-        "success",
-      );
-    }
-  };
-
-  const moveSinglePhoto = async (id: string, targetCategory: string) => {
-    // Optimistic update
-    setPhotos(
-      photos.map((p) => (p.id === id ? { ...p, category: targetCategory } : p)),
-    );
-
-    try {
-      await api.updateImageCategory(propertyId, id, targetCategory);
-      showSnackbar("Image moved", "success");
-    } catch (err) {
-      showSnackbar("Failed to move image", "error");
-      console.error(err);
-      // Revert
-      loadPropertyImages();
-    }
-  };
-
-  const saveCustomCategory = async (id: string, customCategory: string) => {
-    if (!customCategory.trim()) {
-      showSnackbar("Category name cannot be empty", "error");
-      return;
-    }
-
-    // Optimistic update
-    setPhotos(
-      photos.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              category: customCategory.trim(),
-              customCategoryInput: undefined,
-            }
-          : p,
-      ),
-    );
-
-    try {
-      await api.updateImageCategory(propertyId, id, customCategory.trim());
-      showSnackbar(`Saved as "${customCategory.trim()}"`, "success");
-    } catch (err) {
-      showSnackbar("Failed to save category", "error");
-      console.error(err);
-      // Revert
-      loadPropertyImages();
-    }
-  };
-
-  const enableCustomCategoryInput = (id: string) => {
-    setPhotos(
-      photos.map((p) => (p.id === id ? { ...p, customCategoryInput: "" } : p)),
-    );
-  };
-
-  const updateCustomCategoryInput = (id: string, value: string) => {
-    setPhotos(
-      photos.map((p) =>
-        p.id === id ? { ...p, customCategoryInput: value } : p,
-      ),
-    );
-  };
-
-  const cancelCustomCategoryInput = (id: string) => {
-    setPhotos(
-      photos.map((p) =>
-        p.id === id ? { ...p, customCategoryInput: undefined } : p,
-      ),
-    );
-  };
-
-  // Calculate category counts dynamically
-  const categoriesWithCounts = categories.map((cat) => ({
-    ...cat,
-    count: photos.filter((p) => p.category === cat.id).length,
-  }));
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
+      <Backdrop open>
+        <CircularProgress />
+      </Backdrop>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar Categories */}
-      <aside className="w-80 border-r border-border bg-sidebar flex flex-col p-6 fixed h-full z-10">
-        <div className="mb-8">
-          <div className="flex justify-between items-start mb-1">
-            <h2 className="text-sm font-medium text-primary">
-              Subject Property
-            </h2>
-            <span className="architectural-label text-[10px]">
-              MLS ID #{propertyId.slice(0, 6)}
-            </span>
-          </div>
-          <p className="text-muted-foreground text-xs">Organization Utility</p>
-        </div>
+    <>
+      <AppNavbar propertyId={propertyId} showBack={true} bgcolor={ui.bg}/>
 
-        <div className="mb-6">
-          <h3 className="architectural-label mb-4">Room Buckets</h3>
-          <p className="text-xs text-muted-foreground mb-6">
-            Categorize photos by dragging into folders
-          </p>
+      <Box
+        sx={{
+          position: "fixed",
+          top: 64,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: "flex",
+          bgcolor: ui.bg,
+          overflow: "hidden",
+        }}
+      >
+        {/* ========== LEFT SIDEBAR ========== */}
+        <Paper
+          elevation={0}
+          sx={{
+            width: 300,
+            p: 3,
+            backgroundColor: ui.bg,
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "12px",
+              letterSpacing: 1,
+              color: ui.muted,
+              mb: 0.5,
+              textTransform: "uppercase",
+            }}
+          >
+            ROOM BUCKETS
+          </Typography>
 
-          <div className="space-y-1">
-            {categoriesWithCounts.map((cat) => {
-              const Icon = cat.icon;
-              const isActive = selectedCategory === cat.id;
+          <Box
+            display="flex"
+            flexDirection="column"
+            gap={1}
+            mt={2}
+            sx={{
+              flex: 1,
+              overflowY: "auto",
+              pr: 1,
+              "&::-webkit-scrollbar": { width: 6 },
+              "&::-webkit-scrollbar-thumb": {
+                backgroundColor: ui.border,
+                borderRadius: 10,
+              },
+            }}
+          >
+            {dynamicCategories?.map((cat) => {
+              const isActive = selectedCategory === cat.label;
+
               return (
-                <button
+                <Box
                   key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "hover:bg-secondary text-muted-foreground hover:text-foreground",
-                  )}
+                  onClick={() => setSelectedCategory(cat.label)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    px: 1.5,
+                    py: 1.2,
+                    borderRadius: 1,
+                    cursor: "pointer",
+                    bgcolor: isActive ? "#0B1320" : "transparent",
+                    color: isActive ? "white" : ui.text,
+                    "&:hover": {
+                      bgcolor: isActive ? "#0B1320" : "#f3f3f3",
+                    },
+                  }}
                 >
-                  <div className="flex items-center gap-3">
-                    <Icon className="w-4 h-4" />
-                    <span className="font-medium">{cat.label}</span>
-                  </div>
-                  <span
-                    className={cn(
-                      "text-xs font-bold px-2 py-0.5 rounded-full",
-                      isActive ? "bg-primary-foreground/20" : "bg-secondary",
-                    )}
+                  <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
+                    {cat.label}
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: isActive ? "white" : ui.muted,
+                      letterSpacing: 1,
+                    }}
                   >
                     {cat.count}
-                  </span>
-                </button>
+                  </Typography>
+                </Box>
               );
             })}
-          </div>
-        </div>
+          </Box>
+        </Paper>
 
-        <div className="mt-auto">
-          <div className="flex justify-between text-xs mb-2 font-medium">
-            <span className="architectural-label">Progress</span>
-            <span>58%</span>
-          </div>
-          <Progress value={58} className="h-1 bg-secondary" />
-          <p className="mt-4 text-[10px] text-muted-foreground leading-relaxed">
-            Sorting all subject property images ensures the AI correctly
-            identifies design contexts.
-          </p>
-        </div>
-      </aside>
+        {/* ========== RIGHT PANEL ========== */}
+        <Box sx={{ flex: 1, p: 3, overflowY: "auto" }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              border: `1px solid ${ui.border}`,
+              backgroundColor: ui.white,
+              minHeight: "100%",
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={1} mb={3}>
+              <Typography
+                sx={{ fontSize: 20, fontWeight: 500, letterSpacing: 1 }}
+              >
+                Subject Property Library
+              </Typography>
 
-      {/* Main Grid */}
-      <main className="flex-1 ml-80 p-8 min-h-screen bg-[#f8f9fa]">
-        <header className="flex items-center justify-between mb-8 sticky top-0 bg-[#f8f9fa]/95 backdrop-blur z-20 py-4 -my-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-light text-primary">
-              {categories.find((c) => c.id === selectedCategory)?.label ||
-                "Library"}
-            </h1>
-            <span className="text-sm text-muted-foreground">
-              {filteredPhotos.length} items •{" "}
-              {selectedCount > 0
-                ? `${selectedCount} selected`
-                : "Select items to organize"}
-            </span>
-          </div>
+              <Typography
+                sx={{ fontSize: 13, color: ui.muted, letterSpacing: 1 }}
+              >
+                {photos.length} items total •{" "}
+                {
+                  photos.filter(
+                    (p) => p.roomCategory.toLowerCase() !== "unknown",
+                  ).length
+                }{" "}
+                categorized
+              </Typography>
+            </Box>
 
-          <div className="flex items-center gap-4">
-            {selectedCount > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="rounded-full bg-primary text-white shadow-md text-xs font-medium h-9 px-4 animate-in fade-in slide-in-from-right-4"
+            <Grid container spacing={3}>
+              {filteredPhotos.map((photo) => (
+                <Grid key={photo.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                  <Card
+                    onClick={() => toggleSelection(photo.id)}
+                    sx={{
+                      position: "relative",
+                      cursor: "pointer",
+                      borderRadius: ui.cardRadius,
+                      boxShadow: "0px 2px 6px rgba(0,0,0,0.06)",
+                      border: 
+                       
+                         `1px solid ${ui.border}`,
+                    }}
                   >
-                    <FolderInput className="w-3 h-3 mr-2" />
-                    Move {selectedCount} to...
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>Move to Category</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {categories
-                    .filter((c) => c.id !== selectedCategory)
-                    .map((cat) => (
-                      <DropdownMenuItem
-                        key={cat.id}
-                        onClick={() => moveSelectedPhotos(cat.id)}
-                      >
-                        <cat.icon className="w-4 h-4 mr-2" />
-                        {cat.label}
-                      </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                    <CardMedia
+                      component="img"
+                      image={photo.src}
+                      sx={{
+                        width: "100%",
+                        height: 180,
+                        objectFit: "cover",
+                        aspectRatio: "4 / 3",
+                      }}
+                    />
 
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-9 h-9 rounded-full bg-white shadow-sm border border-border"
-              >
-                <Search className="w-4 h-4 text-muted-foreground" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full bg-white shadow-sm border border-border text-xs font-medium h-9 px-4 hover:text-primary"
-              >
-                <Wand2 className="w-3 h-3 mr-2" />
-                Suggest Auto-Sort
-              </Button>
-            </div>
-          </div>
-        </header>
+                   
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-24">
-          {filteredPhotos.map((photo) => (
-            <div
-              key={photo.id}
-              className={cn(
-                "group relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300",
-                photo.selected
-                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg scale-[1.02]"
-                  : "hover:shadow-md",
-              )}
-              onClick={() => toggleSelection(photo.id)}
-            >
-              <img
-                src={photo.src}
-                alt="Property"
-                className="w-full h-full object-cover"
-              />
-
-              <div
-                className={cn(
-                  "absolute inset-0 bg-black/10 transition-opacity duration-200",
-                  photo.selected
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100",
-                )}
-              >
-                {/* Selection Indicator */}
-                <div
-                  className={cn(
-                    "absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200",
-                    photo.selected
-                      ? "bg-primary text-white"
-                      : "bg-white/90 text-transparent border border-white/50",
-                  )}
-                >
-                  <Check className="w-3.5 h-3.5" />
-                </div>
-
-                {/* Individual Move Menu */}
-                <div
-                  className="absolute top-3 left-3"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="w-8 h-8 rounded-full bg-white/90 backdrop-blur shadow-sm hover:bg-white text-muted-foreground hover:text-primary"
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-48">
-                      <DropdownMenuLabel>Move to Category</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {categories
-                        .filter((c) => c.id !== photo.category)
-                        .map((cat) => (
-                          <DropdownMenuItem
-                            key={cat.id}
-                            onClick={() => moveSinglePhoto(photo.id, cat.id)}
-                          >
-                            <cat.icon className="w-4 h-4 mr-2" />
-                            {cat.label}
-                          </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Custom Category Input for Uncategorized */}
-                {selectedCategory === "uncategorized" &&
-                  photo.customCategoryInput === undefined && (
-                    <div
-                      className="absolute bottom-3 left-3 right-3"
-                      onClick={(e) => e.stopPropagation()}
+                    <IconButton
+                      sx={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        width: 28,
+                        height: 28,
+                        minWidth: 28,
+                        minHeight: 28,
+                        p: 0.5,
+                        bgcolor: "white",
+                        border: `1px solid ${ui.border}`,
+                        boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivePhoto(photo.id);
+                        setMenuAnchor(e.currentTarget);
+                      }}
                     >
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="w-full bg-white/90 backdrop-blur shadow-sm hover:bg-white text-xs"
-                        onClick={() => enableCustomCategoryInput(photo.id)}
-                      >
-                        + Add Custom Category
-                      </Button>
-                    </div>
-                  )}
+                      <MoreHoriz sx={{ color: ui.text }} />
+                    </IconButton>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        </Box>
 
-                {/* Custom Category Input Field */}
-                {photo.customCategoryInput !== undefined && (
-                  <div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="bg-white rounded-lg p-4 w-full max-w-[280px] shadow-lg">
-                      <h4 className="text-sm font-medium mb-2">
-                        Enter Category Name
-                      </h4>
-                      <input
-                        type="text"
-                        className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-3"
-                        placeholder="e.g., Pool Area, Deck"
-                        value={photo.customCategoryInput}
-                        onChange={(e) =>
-                          updateCustomCategoryInput(photo.id, e.target.value)
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            saveCustomCategory(
-                              photo.id,
-                              photo.customCategoryInput || "",
-                            );
-                          } else if (e.key === "Escape") {
-                            cancelCustomCategoryInput(photo.id);
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 text-xs"
-                          onClick={() =>
-                            saveCustomCategory(
-                              photo.id,
-                              photo.customCategoryInput || "",
-                            )
-                          }
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 text-xs"
-                          onClick={() => cancelCustomCategoryInput(photo.id)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {filteredPhotos.length === 0 && (
-            <div className="col-span-full aspect-[4/1] rounded-2xl border border-dashed border-border bg-secondary/10 flex flex-col items-center justify-center text-muted-foreground">
-              <p className="text-sm font-medium">No items in this category</p>
-              <p className="text-xs opacity-60 mt-1">
-                Move photos here to organize them
-              </p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Floating Footer Action */}
-      <div className="fixed bottom-8 right-8 z-20 flex items-center gap-4 animate-in slide-in-from-bottom-10 duration-700 delay-300">
-        <span className="architectural-label bg-white/80 backdrop-blur px-3 py-1 rounded-full border border-border">
-          Awaiting Final Review
-        </span>
-        <Button
-          onClick={handleContinue}
-          className="h-12 pl-6 pr-4 rounded-full bg-primary text-primary-foreground font-medium text-xs uppercase tracking-widest hover:bg-primary/90 shadow-strong hover:translate-y-[-2px] transition-all"
+        {/* MOVE MENU (DYNAMIC) */}
+        <Menu
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={() => setMenuAnchor(null)}
         >
-          Looks Good, Continue
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </div>
+          {dynamicCategories
+            ?.filter((c) => c.label !== selectedCategory)
+            ?.map((cat) => (
+              <MenuItem
+                key={cat.id}
+                onClick={() => {
+                  if (activePhoto) {
+                    moveSinglePhoto(activePhoto, cat.label);
+                  }
+                  setMenuAnchor(null);
+                }}
+              >
+                {cat.label}
+              </MenuItem>
+            ))}
+        </Menu>
+
+        {/* FLOATING CONTINUE BUTTON */}
+        <Box
+          position="fixed"
+          bottom={24}
+          left={340}
+          right={24}
+          display="flex"
+          alignItems="center"
+          justifyContent="flex-end"
+          px={2}
+          py={4}
+        >
+          <Button
+            onClick={handleContinue}
+            endIcon={<ArrowForward />}
+            sx={{
+              bgcolor: "#0B1320",
+              color: "white",
+              borderRadius: 999,
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              fontSize: 12,
+              px: 3,
+              py: 1.2,
+              boxShadow: "0px 6px 16px rgba(0,0,0,0.15)",
+            }}
+          >
+            LOOKS GOOD, CONTINUE
+          </Button>
+        </Box>
+      </Box>
+    </>
   );
 }

@@ -31,7 +31,7 @@ export default function ProfileMenu() {
   const handleLogout = async () => {
     handleMenuClose();
     await api.logout();
-    setLocation("/login");
+    setLocation("/");
   };
 
   return (

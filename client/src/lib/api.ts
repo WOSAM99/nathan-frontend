@@ -1,10 +1,11 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://046efa4d0b1b.ngrok-free.app";
+  import.meta.env.VITE_API_URL || "https://79fe-115-96-27-193.ngrok-free.app";
 
 interface AuthTokens {
   access_token: string;
   refresh_token: string;
   token_type: string;
+  user_id: string;
 }
 
 interface LoginRequest {
@@ -60,6 +61,7 @@ interface PropertyDetails {
   pdf_urls: string[];
   created_at: string;
   chat_history: any[];
+  images:any[]
 }
 
 interface Room {
@@ -129,7 +131,7 @@ class ApiClient {
 
     // Add Authorization header if token exists
     if (this.accessToken) {
-      headers["Authorization"] = `Bearer ${this.accessToken}`;
+      headers["Authorization"] = `Bearer ${this.accessToken}`;  
       console.log(
         `[API] Authorization header set:`,
         headers["Authorization"].substring(0, 30) + "...",
@@ -163,7 +165,7 @@ class ApiClient {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true",   },
         credentials: "include", // Send HttpOnly cookie automatically
         // No body - backend uses cookie
       });
@@ -229,24 +231,33 @@ class ApiClient {
     }
   }
 
-  async getProjects(): Promise<Project[]> {
-    const response = await this.request<any[]>("/doc/projects");
-    // Map backend PropertyData to frontend Project interface
-    return response.map((p) => ({
+async getProjects(user_id: string): Promise<Project[]> {
+  const response = await this.request<any[]>(
+    `/doc/projects?user_id=${user_id}`
+  );
+
+  return response.map((p) => {
+    // Correct way to get FIRST MLS IMAGE
+    const firstMlsImage =
+      p.files?.mls?.images?.[0]?.url || undefined;
+
+    return {
       property_id: p.property_id,
       user_id: p.user_id,
       created_at: p.created_at,
-      total_images: (p.files || []).length, // Fallback for list view
-      thumbnail_url: p.files?.[0]?.id
-        ? this.getImageUrl(p.files[0].id)
-        : undefined,
+      total_images: p.files?.mls?.total_images || 0,
+      thumbnail_url: firstMlsImage,
       pdf_urls: p.pdf_urls || [],
-    }));
-  }
+      files: p.files, 
+    };
+  });
+}
 
-  async getPropertyDetails(propertyId: string): Promise<PropertyDetails> {
-    return this.request<PropertyDetails>(`/doc/${propertyId}`);
-  }
+async getPropertyDetails(propertyId: string, userId: string): Promise<PropertyDetails> {
+  const query = `?property_id=${propertyId}&user_id=${userId}`;
+
+  return this.request<PropertyDetails>(`/doc/property${query}`);
+}
 
   async uploadPDF(
     files: File[],
@@ -261,9 +272,10 @@ class ApiClient {
     const actualPropertyId =
       propertyId === "new" ? crypto.randomUUID() : propertyId;
     formData.append("property_id", actualPropertyId);
-    formData.append("file_type", fileType);
 
-    files.forEach((file) => formData.append("files", file));
+    const fieldName = fileType === "mls" ? "mls_files" : "comps_files";
+
+    files.forEach((file) => formData.append(fieldName, file));
 
     const response = await fetch(`${API_BASE_URL}/doc/upload`, {
       method: "POST",
@@ -308,13 +320,14 @@ class ApiClient {
   }
 
   async updateImageCategory(
-    propertyId: string,
-    imageId: string,
+    property_id: string,
+    image_id: string,
     category: string,
+    user_id:string
   ): Promise<any> {
-    return this.request(`/doc/image/${propertyId}/${imageId}/category`, {
+    return this.request(`/doc/image/category`, {
       method: "PUT",
-      body: JSON.stringify({ category }),
+      body: JSON.stringify({ category,property_id ,image_id,user_id}),
     });
   }
 

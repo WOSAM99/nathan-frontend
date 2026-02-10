@@ -5,15 +5,13 @@ import {
   Button,
   TextField,
   IconButton,
-  Avatar,
 } from "@mui/material";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
+import CircularProgress from "@mui/material/CircularProgress";
 import { useLocation } from "wouter";
 import { api } from "@/lib/api";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
-import ProfileMenu from "@/components/ProfileMenu";
 import AppNavbar from "@/components/AppNavBar";
 
 export default function ProjectSetupPage() {
@@ -68,10 +66,10 @@ export default function ProjectSetupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (mlsFiles.length === 0 && compFiles.length === 0) {
-      showSnackbar("Please upload at least one document", "error");
-      return;
-    }
+    if (mlsFiles.length === 0) {
+    showSnackbar("Please upload MLS Listing PDF", "error");
+    return;
+  }
 
     setIsSubmitting(true);
 
@@ -102,7 +100,7 @@ export default function ProjectSetupPage() {
       }}
     >
       {/* HEADER */}
-      <AppNavbar isFromProjectSetupPage={true} showBack={true} />
+      <AppNavbar showBack={true} />
 
       <Box
         sx={{
@@ -330,28 +328,33 @@ export default function ProjectSetupPage() {
         {/* IMPORT BUTTON */}
         <Box textAlign="center">
           <Button
-            type="submit"
-            form="project-setup-form"
-            disabled={
-              isSubmitting || (mlsFiles.length === 0 && compFiles.length === 0)
-            }
-            sx={{
-              bgcolor: "#0b1320",
-              color: "#fff",
-              borderRadius: 20,
-              px: 5,
-              py: 1.2,
-              letterSpacing: 1,
-              "&:hover": { bgcolor: "#0b1320" },
-              "&.Mui-disabled": {
-                backgroundColor: "#0b1320",
-                color: "#ffffff",
-                opacity: 0.7,
-              },
-            }}
-          >
-            {isSubmitting ? "Processing..." : "IMPORT PHOTOS"}
-          </Button>
+  type="submit"
+  form="project-setup-form"
+  disabled={
+    isSubmitting || (mlsFiles.length === 0 && compFiles.length === 0)
+  }
+  startIcon={
+    isSubmitting ? (
+      <CircularProgress size={16} sx={{ color: "#fff" }} />
+    ) : null
+  }
+  sx={{
+    bgcolor: "#0b1320",
+    color: "#fff",
+    borderRadius: 20,
+    px: 5,
+    py: 1.2,
+    letterSpacing: 1,
+    "&:hover": { bgcolor: "#0b1320" },
+    "&.Mui-disabled": {
+      backgroundColor: "#0b1320",
+      color: "#ffffff",
+      opacity: 0.7,
+    },
+  }}
+>
+  {isSubmitting ? "Processing..." : "IMPORT PHOTOS"}
+</Button>
         </Box>
       </Box>
 

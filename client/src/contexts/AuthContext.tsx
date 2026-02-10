@@ -5,6 +5,8 @@ import { useLocation } from 'wouter';
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  userId: string | null;
+  setUserId: (id: string | null) => void;
   login: (data: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
@@ -16,16 +18,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
+  const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setIsAuthenticated(api.isAuthenticated());
+
+ useEffect(() => {
+    const savedUserId = localStorage.getItem("user_id");
+    if (savedUserId) {
+      setUserId(savedUserId);
+      setIsAuthenticated(true);
+    }
+
     setIsLoading(false);
   }, []);
 
   const login = async (data: LoginRequest) => {
-    await api.login(data);
+    const res = await api.login(data); 
+    setUserId(res.user_id);
+    localStorage.setItem("user_id", res.user_id);
+
     setIsAuthenticated(true);
-    setLocation('/dashboard');
+    setLocation("/dashboard");
   };
 
   const register = async (data: RegisterRequest) => {
@@ -37,11 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await api.logout();
     setIsAuthenticated(false);
-    setLocation('/');
+    setUserId(null);
+    localStorage.removeItem("user_id");
+    setLocation("/");
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, login, register, logout, userId, 
+    setUserId, }}>
       {children}
     </AuthContext.Provider>
   );

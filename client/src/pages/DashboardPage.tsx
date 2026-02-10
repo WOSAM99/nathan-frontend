@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -19,63 +19,12 @@ import { useLocation } from "wouter";
 import { api, Project } from "@/lib/api";
 import AppNavbar from "@/components/AppNavBar";
 import ClearIcon from "@mui/icons-material/Clear";
-
-/* ----- DUMMY DATA ----- */
-const dummyProjects: Project[] = [
-  {
-    property_id: "123 Magnolia St",
-    user_id: "u1",
-    created_at: new Date().toISOString(),
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=600",
-    pdf_urls: [],
-    city: "Beverly Hills",
-    state: "CA",
-    status: "IN_PROGRESS",
-    days_left: 12,
-  },
-  {
-    property_id: "458 Silver Lake Blvd",
-    user_id: "u1",
-    created_at: new Date().toISOString(),
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=600",
-    pdf_urls: [],
-    city: "Los Angeles",
-    state: "CA",
-    status: "COMPLETED",
-    roi_percent: 22.4,
-  },
-  {
-    property_id: "88 Oakmont Dr",
-    user_id: "u1",
-    created_at: new Date().toISOString(),
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600",
-    pdf_urls: [],
-    city: "Bel Air",
-    state: "CA",
-    status: "PLANNING",
-    drafts_ready: 4,
-  },
-  {
-    property_id: "1022 Westview",
-    user_id: "u1",
-    created_at: new Date().toISOString(),
-    thumbnail_url:
-      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=600",
-    pdf_urls: [],
-    city: "Malibu",
-    state: "CA",
-    status: "IN_PROGRESS",
-    days_left: 34,
-  },
-];
-
-/* ---------------------- */
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
+  const { userId } = useAuth();
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,22 +32,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [userId]);
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
-      const data = await api.getProjects();
-      setProjects(data.length ? data : dummyProjects);
+      if (userId) {
+        const data = await api.getProjects(userId);
+        setProjects(data);
+      }
     } catch {
-      setProjects(dummyProjects);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const filteredProjects = projects.filter((p) =>
-    p.property_id.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  }, [userId]);
 
   return (
     <Box>
@@ -212,7 +159,7 @@ export default function DashboardPage() {
             alignItems: "stretch",
           }}
         >
-          {filteredProjects?.map((project, idx) => (
+          {projects?.map((project, idx) => (
             <Grid key={project.property_id} size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 sx={{
@@ -234,28 +181,6 @@ export default function DashboardPage() {
                   }}
                 />
 
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: 10,
-                    left: 10,
-                    bgcolor: "rgba(255,255,255,0.9)",
-                    px: 1.5,
-                    py: 0.5,
-                    borderRadius: 1,
-                  }}
-                >
-                  <Typography
-                    sx={{ fontSize: 10, fontWeight: 600, letterSpacing: 1 }}
-                  >
-                    {idx === 0
-                      ? "IN PROGRESS"
-                      : idx === 1
-                        ? "COMPLETED"
-                        : "PLANNING"}
-                  </Typography>
-                </Box>
-
                 {/* CARD CONTENT */}
                 <CardContent
                   sx={{
@@ -264,7 +189,6 @@ export default function DashboardPage() {
                     gap: 1,
                   }}
                 >
-                  {/* ===== TOP ROW: TITLE + METRIC ===== */}
                   <Box
                     sx={{
                       display: "flex",
@@ -272,17 +196,9 @@ export default function DashboardPage() {
                       alignItems: "flex-start",
                     }}
                   >
-                    <Box>
-                      <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
-                        {project.property_id}
-                      </Typography>
-                      <Typography
-                        sx={{ fontSize: 12, color: "#888", letterSpacing: 1 }}
-                      >
-                        {project.city || "Beverly Hills"},{" "}
-                        {project.state || "CA"}
-                      </Typography>
-                    </Box>
+                    <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
+                      {project.property_id}
+                    </Typography>
 
                     <Box textAlign="right">
                       {project.status === "IN_PROGRESS" &&
@@ -433,41 +349,6 @@ export default function DashboardPage() {
           </Grid>
         </Grid>
       )}
-      <Box
-        sx={{
-          width: "100%",
-          backgroundColor: "#ffffff",
-
-          mt: 4,
-        }}
-      >
-        {/* ===== FOOTER ===== */}
-        <Box
-          sx={{
-            mx: 4,
-            py: 4,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            backgroundColor: "#fff",
-          }}
-        >
-          <Typography sx={{ fontSize: 12, color: "#888", letterSpacing: 1 }}>
-            © 2026 Atelier Interiors
-          </Typography>
-          <Box display="flex" gap={3}>
-            <Typography sx={{ fontSize: 12, letterSpacing: 1 }}>
-              Privacy
-            </Typography>
-            <Typography sx={{ fontSize: 12, letterSpacing: 1 }}>
-              Support
-            </Typography>
-          </Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>
-            84% Capacity
-          </Typography>
-        </Box>
-      </Box>
     </Box>
   );
 }
