@@ -145,14 +145,13 @@ export default function DesignWorkspacePage() {
   }, [activeSpace]);
 
   const handleExecute = async () => {
-
     if (selectedBaselineIds.length === 0 && selectedCompsIds.length === 0) {
-    showSnackbar(
-      "Please select at least one image (Baseline or Market Comps) to generate a new design",
-      "warning"
-    );
-    return;
-  }
+      showSnackbar(
+        "Please select at least one image (Baseline or Market Comps) to generate a new design",
+        "warning",
+      );
+      return;
+    }
 
     if (!inputText.trim()) return;
 
@@ -769,6 +768,7 @@ export default function DesignWorkspacePage() {
                         overflow: "hidden",
                         position: "relative",
                         bgcolor: "white",
+                        display: "flex",
                       }}
                     >
                       <Box
@@ -791,9 +791,12 @@ export default function DesignWorkspacePage() {
 
                       <CardMedia
                         component="img"
-                        height="140"
                         image={item.url}
-                        sx={{ objectFit: "cover", width: "100%" }}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
                       />
                     </Paper>
                   ))}
@@ -804,134 +807,136 @@ export default function DesignWorkspacePage() {
 
           {/* ================= MARKET COMPS CAROUSEL ================= */}
 
-          <Box mt={4}>
-            {/* HEADER + NAV BUTTONS */}
-            <Box
-              display="flex"
-              alignItems="center"
-              justifyContent="space-between"
-              mb={2}
-            >
-              <Box display="flex" alignItems="center" gap={1}>
-                <CollectionsOutlined
-                  fontSize="small"
-                  sx={{ color: ui.muted }}
-                />
-                <Typography fontWeight={600}>MARKET COMPS</Typography>
-              </Box>
-
-              <Box display="flex" gap={1}>
-                <IconButton
-                  onClick={() =>
-                    document.getElementById("comps-carousel")?.scrollBy({
-                      left: -450,
-                      behavior: "smooth",
-                    })
-                  }
-                  sx={{
-                    border: `1px solid ${ui.border}`,
-                    bgcolor: "white",
-                    width: 32,
-                    height: 32,
-                  }}
-                >
-                  <ChevronLeft fontSize="small" />
-                </IconButton>
-
-                <IconButton
-                  onClick={() =>
-                    document.getElementById("comps-carousel")?.scrollBy({
-                      left: 450,
-                      behavior: "smooth",
-                    })
-                  }
-                  sx={{
-                    border: `1px solid ${ui.border}`,
-                    bgcolor: "white",
-                    width: 32,
-                    height: 32,
-                  }}
-                >
-                  <ChevronRight fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-
-            {/* WRAPPER CARD */}
-            <Paper
-              sx={{
-                p: 2,
-                borderRadius: 3,
-                border: `1px solid ${ui.border}`,
-                width: "100%",
-                overflow: "hidden",
-              }}
-            >
+          {compsImages?.length ? (
+            <Box mt={4}>
+              {/* HEADER + NAV BUTTONS */}
               <Box
-                id="comps-carousel"
-                sx={{
-                  display: "flex",
-                  gap: 2,
-                  overflowX: compsImages?.length > 4 ? "auto" : "hidden",
-                  scrollBehavior: "smooth",
-                  width: "100%",
-                  maxWidth: "100%",
-                  boxSizing: "border-box",
-                  justifyContent:
-                    compsImages?.length <= 4 ? "center" : "flex-start",
-
-                  "&::-webkit-scrollbar": { display: "none" },
-                }}
+                display="flex"
+                alignItems="center"
+                justifyContent="space-between"
+                mb={2}
               >
-                {compsImages?.map((img: any, i: number) => (
-                  <Card
-                    key={i}
-                    onClick={() => toggleCompsSelect(img.id)}
+                <Box display="flex" alignItems="center" gap={1}>
+                  <CollectionsOutlined
+                    fontSize="small"
+                    sx={{ color: ui.muted }}
+                  />
+                  <Typography fontWeight={600}>MARKET COMPS</Typography>
+                </Box>
+
+                <Box display="flex" gap={1}>
+                  <IconButton
+                    onClick={() =>
+                      document.getElementById("comps-carousel")?.scrollBy({
+                        left: -450,
+                        behavior: "smooth",
+                      })
+                    }
                     sx={{
-                      flexShrink: 0,
-                      width: {
-                        xs: "100%",
-                        sm: "50%",
-                        md: "33.33%",
-                        lg: "calc(25% - 12px)",
-                      },
-                      borderRadius: 3,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      position: "relative",
-                      border: selectedCompsIds?.includes(img.id)
-                        ? `3px solid ${ui.blue}`
-                        : `1px solid ${ui.border}`,
+                      border: `1px solid ${ui.border}`,
+                      bgcolor: "white",
+                      width: 32,
+                      height: 32,
                     }}
                   >
-                    <CardMedia
-                      component="img"
-                      image={img.url}
+                    <ChevronLeft fontSize="small" />
+                  </IconButton>
+
+                  <IconButton
+                    onClick={() =>
+                      document.getElementById("comps-carousel")?.scrollBy({
+                        left: 450,
+                        behavior: "smooth",
+                      })
+                    }
+                    sx={{
+                      border: `1px solid ${ui.border}`,
+                      bgcolor: "white",
+                      width: 32,
+                      height: 32,
+                    }}
+                  >
+                    <ChevronRight fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Box>
+
+              {/* WRAPPER CARD */}
+              <Paper
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: `1px solid ${ui.border}`,
+                  width: "100%",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  id="comps-carousel"
+                  sx={{
+                    display: "flex",
+                    gap: 2,
+                    overflowX: compsImages?.length > 4 ? "auto" : "hidden",
+                    scrollBehavior: "smooth",
+                    width: "100%",
+                    maxWidth: "100%",
+                    boxSizing: "border-box",
+                    justifyContent:
+                      compsImages?.length <= 4 ? "center" : "flex-start",
+
+                    "&::-webkit-scrollbar": { display: "none" },
+                  }}
+                >
+                  {compsImages?.map((img: any, i: number) => (
+                    <Card
+                      key={i}
+                      onClick={() => toggleCompsSelect(img.id)}
                       sx={{
-                        width: "100%",
+                        flexShrink: 0,
+                        width: {
+                          xs: "100%",
+                          sm: "50%",
+                          md: "33.33%",
+                          lg: "calc(25% - 12px)",
+                        },
                         height: 180,
-                        objectFit: "cover",
-                        aspectRatio: "4 / 3",
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        position: "relative",
+                        border: selectedCompsIds?.includes(img.id)
+                          ? `3px solid ${ui.blue}`
+                          : `1px solid ${ui.border}`,
                       }}
-                    />
-                    {selectedCompsIds?.includes(img.id) && (
-                      <Check
+                    >
+                      <CardMedia
+                        component="img"
+                        image={img.url}
                         sx={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          bgcolor: ui.blue,
-                          color: "white",
-                          borderRadius: "50%",
-                          p: 0.5,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
                         }}
                       />
-                    )}
-                  </Card>
-                ))}
-              </Box>
-            </Paper>
-          </Box>
+                      {selectedCompsIds?.includes(img.id) && (
+                        <Check
+                          sx={{
+                            position: "absolute",
+                            top: 8,
+                            right: 8,
+                            bgcolor: ui.blue,
+                            color: "white",
+                            borderRadius: "50%",
+                            p: 0.5,
+                          }}
+                        />
+                      )}
+                    </Card>
+                  ))}
+                </Box>
+              </Paper>
+            </Box>
+          ) : null}
         </Box>
         {/* ========== RIGHT CHAT PANEL ========== */}
         <Box
@@ -954,7 +959,7 @@ export default function DesignWorkspacePage() {
             }}
           >
             {/* HEADER */}
-            <Box display="flex" gap={1} alignItems="center">
+            <Box display="flex" gap={1} alignItems="center" sx={{ mb: 2 }}>
               <AutoAwesome fontSize="small" sx={{ color: "#000" }} />
               <Typography fontWeight={700} letterSpacing={1}>
                 DESIGN AGENT
@@ -977,11 +982,6 @@ export default function DesignWorkspacePage() {
                 msOverflowStyle: "none",
               }}
             >
-              {/* {loadingOlder && (
-                <Box textAlign="center" py={1} color={ui.muted} fontSize={12}>
-                  Loading previous messages...
-                </Box>
-              )} */}
               {messages?.map((msg, index) =>
                 msg?.sender === "ai" ? (
                   <Box
@@ -1014,8 +1014,12 @@ export default function DesignWorkspacePage() {
                         maxWidth: "85%",
                         ...(isGenerating && index === messages.length - 1
                           ? {
-                              animation: "pulse 1.2s infinite",
-                              opacity: 0.5,
+                              animation: "blink 1.2s infinite",
+                              "@keyframes blink": {
+                                "0%": { opacity: 1 },
+                                "50%": { opacity: 0.3 },
+                                "100%": { opacity: 1 },
+                              },
                             }
                           : {}),
                       }}
@@ -1046,71 +1050,69 @@ export default function DesignWorkspacePage() {
 
             <Divider sx={{ my: 2 }} />
 
-         {/* INPUT BAR */}
-{/* INPUT BAR */}
-<Box
-  sx={{
-    border: `1px solid ${ui.border}`,
-    borderRadius:4,
-    backgroundColor: "#F3F5F7",
-    px: 2,
-    py: 1.6,
-    minHeight: 64,
-    display: "flex",
-    alignItems: "flex-end",
-    gap: 1,
+            {/* INPUT BAR */}
+            {/* INPUT BAR */}
+            <Box
+              sx={{
+                border: `1px solid ${ui.border}`,
+                borderRadius: 4,
+                backgroundColor: "#F3F5F7",
+                px: 2,
+                py: 1.6,
+                minHeight: 64,
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 1,
+              }}
+            >
+              {/* TEXTAREA */}
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Direct the AI: 'Change the countertop to marble'..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleExecute();
+                  }
+                }}
+                rows={3}
+                style={{
+                  flex: 1,
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  fontSize: 15,
+                  lineHeight: "1.6",
+                  padding: "10px 0",
+                  color: ui.text,
+                  resize: "none",
+                  fontFamily: "inherit",
+                  overflow: "hidden",
+                  borderRadius: 0,
+                }}
+              />
 
-  }}
->
-  {/* TEXTAREA */}
-  <textarea
-    value={inputText}
-    onChange={(e) => setInputText(e.target.value)}
-    placeholder="Direct the AI: 'Change the countertop to marble'..."
-    onKeyDown={(e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleExecute();
-      }
-    }}
-    rows={3}
-    style={{
-      flex: 1,
-      border: "none",
-      background: "transparent",
-      outline: "none",
-      fontSize: 15,
-      lineHeight: "1.6",
-      padding: "10px 0",
-      color: ui.text,
-      resize: "none",
-      fontFamily: "inherit",
-      overflow: "hidden",
-     borderRadius: 0,
-    }}
-  />
-
-  {/* EXECUTE BUTTON */}
-  <Button
-    variant="contained"
-    onClick={handleExecute}
-    sx={{
-      bgcolor: ui.primary,
-      color: "white",
-      borderRadius: 3,
-      px: 2.2,
-      minHeight: 44,
-      textTransform: "none",
-      display: "flex",
-      alignItems: "center",
-      gap: 0.5,
-      "&:hover": { bgcolor: ui.primary },
-    }}
-  >
-    EXECUTE <ChevronRight fontSize="small" />
-  </Button>
-</Box>
-
+              {/* EXECUTE BUTTON */}
+              <Button
+                variant="contained"
+                onClick={handleExecute}
+                sx={{
+                  bgcolor: ui.primary,
+                  color: "white",
+                  borderRadius: 3,
+                  px: 2.2,
+                  minHeight: 44,
+                  textTransform: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  "&:hover": { bgcolor: ui.primary },
+                }}
+              >
+                EXECUTE <ChevronRight fontSize="small" />
+              </Button>
+            </Box>
           </Paper>
         </Box>
       </Box>
