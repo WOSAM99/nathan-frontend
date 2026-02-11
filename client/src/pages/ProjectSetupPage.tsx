@@ -96,7 +96,6 @@ export default function ProjectSetupPage() {
         alignItems: "center",
         justifyContent: "center",
         gap: 4,
-        minHeight: "100vh",
       }}
     >
       {/* HEADER */}
@@ -295,8 +294,6 @@ export default function ProjectSetupPage() {
             )}
           </Box>
         </form>
-
-        <Box mb={2} width="100%" maxWidth={900}></Box>
 
         {/* IMPORT BUTTON */}
         <Box textAlign="center">
