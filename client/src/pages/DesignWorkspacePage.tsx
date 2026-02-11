@@ -1051,7 +1051,6 @@ export default function DesignWorkspacePage() {
             <Divider sx={{ my: 2 }} />
 
             {/* INPUT BAR */}
-            {/* INPUT BAR */}
             <Box
               sx={{
                 border: `1px solid ${ui.border}`,
@@ -1065,7 +1064,6 @@ export default function DesignWorkspacePage() {
                 gap: 1,
               }}
             >
-              {/* TEXTAREA */}
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}

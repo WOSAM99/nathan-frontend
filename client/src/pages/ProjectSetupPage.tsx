@@ -296,80 +296,40 @@ export default function ProjectSetupPage() {
           </Box>
         </form>
 
-        <Box mb={2} width="100%" maxWidth={900}>
-          <Typography
-            sx={{
-              fontSize: 12,
-              letterSpacing: 1,
-              color: "#888",
-              mb: 1,
-              textAlign: "left",
-            }}
-          >
-            OPTIONAL NOTES
-          </Typography>
-
-          <TextField
-            multiline
-            minRows={3}
-            fullWidth
-            placeholder="Add specific instructions or client preferences..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                bgcolor: "#FFFFFF",
-                borderRadius: 2,
-              },
-            }}
-          />
-        </Box>
+        <Box mb={2} width="100%" maxWidth={900}></Box>
 
         {/* IMPORT BUTTON */}
         <Box textAlign="center">
           <Button
-  type="submit"
-  form="project-setup-form"
-  disabled={
-    isSubmitting || (mlsFiles.length === 0 && compFiles.length === 0)
-  }
-  startIcon={
-    isSubmitting ? (
-      <CircularProgress size={16} sx={{ color: "#fff" }} />
-    ) : null
-  }
-  sx={{
-    bgcolor: "#0b1320",
-    color: "#fff",
-    borderRadius: 20,
-    px: 5,
-    py: 1.2,
-    letterSpacing: 1,
-    "&:hover": { bgcolor: "#0b1320" },
-    "&.Mui-disabled": {
-      backgroundColor: "#0b1320",
-      color: "#ffffff",
-      opacity: 0.7,
-    },
-  }}
->
-  {isSubmitting ? "Processing..." : "IMPORT PHOTOS"}
-</Button>
+            type="submit"
+            form="project-setup-form"
+            disabled={
+              isSubmitting || (mlsFiles.length === 0 && compFiles.length === 0)
+            }
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={16} sx={{ color: "#fff" }} />
+              ) : null
+            }
+            sx={{
+              bgcolor: "#0b1320",
+              color: "#fff",
+              borderRadius: 20,
+              px: 5,
+              py: 1.2,
+              letterSpacing: 1,
+              "&:hover": { bgcolor: "#0b1320" },
+              "&.Mui-disabled": {
+                backgroundColor: "#0b1320",
+                color: "#ffffff",
+                opacity: 0.7,
+              },
+            }}
+          >
+            {isSubmitting ? "Processing..." : "IMPORT PHOTOS"}
+          </Button>
         </Box>
       </Box>
-
-      {/* FOOTER */}
-      <Typography
-        sx={{
-          textAlign: "center",
-          mb: 3,
-          fontSize: 10,
-          color: "#888",
-          letterSpacing: 1,
-        }}
-      >
-        SECURITY: END-TO-END ENCRYPTED DATA PROCESSING ENABLED.
-      </Typography>
     </Box>
   );
 }
