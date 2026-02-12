@@ -7,21 +7,22 @@ interface AppNavbarProps {
   centerContent?: React.ReactNode;
   showNewProject?: boolean;
   showBack?: boolean;
-  onBack?: () => void;  
-  propertyId?: string; 
-  bgcolor?:string
+  onBack?: () => void;
+  propertyId?: string;
+  bgcolor?: string;
+  exportPackage?: boolean;
 }
 
 export default function AppNavbar({
   centerContent,
   showNewProject = false,
-  showBack = false,      
+  showBack = false,
   onBack,
-  propertyId,    
-  bgcolor        
+  propertyId,
+  bgcolor,
+  exportPackage,
 }: AppNavbarProps) {
   const [, setLocation] = useLocation();
-
 
   const handleBack = () => {
     if (onBack) {
@@ -34,7 +35,7 @@ export default function AppNavbar({
   return (
     <Box
       sx={{
-        width: "100%", 
+        width: "100%",
         mx: "auto",
         px: { xs: 2, sm: 4 },
         py: 2,
@@ -48,7 +49,6 @@ export default function AppNavbar({
     >
       {/* ================= LEFT SIDE ================= */}
       <Box display="flex" alignItems="center" gap={1.5}>
-
         {showBack && (
           <IconButton size="small" onClick={handleBack}>
             <ArrowBackIosNewOutlinedIcon fontSize="small" />
@@ -70,12 +70,12 @@ export default function AppNavbar({
               >
                 SUBJECT PROPERTY
               </Typography>
-              <Typography sx={{ fontSize: "12px", color: "#6B7280",letterSpacing: 1, }}>
+              <Typography
+                sx={{ fontSize: "12px", color: "#6B7280", letterSpacing: 1 }}
+              >
                 Organization Utility
               </Typography>
             </Box>
-
-            
           </Box>
         ) : (
           <>
@@ -113,6 +113,22 @@ export default function AppNavbar({
             }}
           >
             + NEW PROJECT
+          </Button>
+        )}
+        {exportPackage && (
+          <Button
+            variant="contained"
+            sx={{
+              bgcolor: "#000",
+              color: "white",
+              borderRadius: 999,
+              textTransform: "none",
+              px: 2.5,
+              fontSize: 12,
+              letterSpacing: 1,
+            }}
+          >
+            EXPORT PACKAGE
           </Button>
         )}
         <ProfileMenu />

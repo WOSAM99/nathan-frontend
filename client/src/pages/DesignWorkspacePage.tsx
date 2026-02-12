@@ -10,6 +10,9 @@ import {
   Paper,
   Divider,
   Chip,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import { useRoute } from "wouter";
 import { api, PropertyDetails } from "@/lib/api";
@@ -26,6 +29,7 @@ import Check from "@mui/icons-material/Check";
 import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import CollectionsOutlined from "@mui/icons-material/CollectionsOutlined";
 import History from "@mui/icons-material/History";
+import AppNavbar from "@/components/AppNavBar";
 
 /* ================= DESIGN TOKENS ================= */
 const ui = {
@@ -49,7 +53,6 @@ export default function DesignWorkspacePage() {
   const [propertyDetails, setPropertyDetails] =
     useState<PropertyDetails | null>(null);
   const [activeSpace, setActiveSpace] = useState("Kitchen");
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [spaces, setSpaces] = useState<string[]>([]);
   const [inputText, setInputText] = useState("");
   const [messages, setMessages] = useState<{ sender: string; text: string }[]>(
@@ -58,7 +61,7 @@ export default function DesignWorkspacePage() {
   const [viewMode, setViewMode] = useState<"compare" | "single">("single");
   const [spaceImages, setSpaceImages] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [compsImages, setCompsImages] = useState<any[]>([]);
+  const [compsImages, setCompsImages] = useState<any>();
   const [selectedBaselineIds, setSelectedBaselineIds] = useState<string[]>([]);
   const [selectedCompsIds, setSelectedCompsIds] = useState<string[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -67,31 +70,7 @@ export default function DesignWorkspacePage() {
     { v: string; url: string; description: string }[]
   >([]);
   const [versionCounter, setVersionCounter] = useState(1.1);
-
-  // const [hasMore, setHasMore] = useState(true);
-  // const [loadingOlder, setLoadingOlder] = useState(false);
-
-  // const loadOlderMessages = async () => {
-  //   if (loadingOlder || !hasMore) return;
-
-  //   setLoadingOlder(true);
-
-  //   setTimeout(() => {
-  //     if (messages.length > 50) {
-  //       setHasMore(false);
-  //     }
-
-  //     setLoadingOlder(false);
-  //   }, 1000);
-  // };
-
-  // const checkIfAtBottom = () => {
-  //   if (!chatContainerRef.current) return true;
-
-  //   const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-
-  //   return scrollHeight - scrollTop <= clientHeight + 10;
-  // };
+  const [selectedAddress, setSelectedAddress] = useState<string>("");
 
   const toggleBaselineSelect = (id: string) => {
     setSelectedBaselineIds((prev) =>
@@ -113,14 +92,6 @@ export default function DesignWorkspacePage() {
   };
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
-
-  const openMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const closeMenu = () => {
-    setAnchorEl(null);
-  };
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -169,10 +140,29 @@ export default function DesignWorkspacePage() {
       { sender: "ai", text: "Generating your design..." },
     ]);
 
+    const images: Record<string, string> = {};
+
+    // Baseline images
+    selectedBaselineIds.forEach((id) => {
+      const img = spaceImages.find((i) => i.id === id);
+      if (img) {
+        images[id] = img.category || activeSpace;
+      }
+    });
+
+    // Comps images
+    selectedCompsIds.forEach((id) => {
+      const img = selectedImages.find((i: any) => i.id === id);
+      if (img) {
+        images[id] = img.category || selectedAddress;
+      }
+    });
+
     const payload = {
       property_id: propertyId,
-      image_ids: [...selectedBaselineIds, ...selectedCompsIds],
+      images,
       user_feedback: userMessage,
+      user_id: userId,
     };
 
     try {
@@ -239,7 +229,7 @@ export default function DesignWorkspacePage() {
         setPropertyDetails(details);
 
         // ---------- GET MLS IMAGES ----------
-        const mlsImages = (details as any)?.mls_images || [];
+        const mlsImages = details?.files?.mls_images?.images || [];
 
         // ---------- EXTRACT SPACES (KEEP UNKNOWN) ----------
         const extractedSpaces: string[] = Array.from(
@@ -292,8 +282,16 @@ export default function DesignWorkspacePage() {
         setActiveSpace(firstSpace);
 
         // ---------- STORE COMPS IMAGES ----------
-        const comps = (details as any)?.comps_images || [];
+        const comps = details?.files?.comps_images || [];
         setCompsImages(comps);
+
+        const firstAddress = comps ? Object.keys(comps?.addresses)[0] : "";
+        setSelectedAddress(firstAddress);
+        console.log(
+          firstAddress,
+          "firstAddressfirstAddressfirstAddressfirstAddress",
+        );
+        // setSelectedAddress(firstAddress);
       } catch (err) {
         showSnackbar("Failed to load property details", "error");
       }
@@ -305,7 +303,7 @@ export default function DesignWorkspacePage() {
   useEffect(() => {
     if (!propertyDetails) return;
 
-    const mlsImages = propertyDetails?.mls_images || [];
+    const mlsImages = propertyDetails?.files?.mls_images?.images || [];
 
     const imagesForSpace = mlsImages?.filter((img: any) => {
       const raw = img?.category || "";
@@ -321,105 +319,12 @@ export default function DesignWorkspacePage() {
     setSpaceImages(imagesForSpace);
   }, [propertyDetails, activeSpace]);
 
+  const selectedImages =
+    compsImages?.addresses?.[selectedAddress]?.images || [];
+
   return (
     <Box minHeight="100vh" bgcolor={ui.bg}>
-      {/* ================= HEADER — IMAGE + USES PROFILE MENU ================= */}
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        px={3}
-        py={1.8}
-        bgcolor="white"
-        borderBottom={`1px solid ${ui.border}`}
-      >
-        {/* LEFT SIDE: LOGO + STUDIO + ACTIVE SPACE */}
-        <Box display="flex" alignItems="center" gap={2}>
-          <Box
-            sx={{
-              width: 22,
-              height: 22,
-              bgcolor: "#0b1320",
-              borderRadius: 1,
-            }}
-          />
-          <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
-            DESIGN AI WORKSPACE
-          </Typography>
-
-          <Box>
-            <Chip
-              label={`ACTIVE SPACE  ${activeSpace}`}
-              variant="outlined"
-              onClick={openMenu}
-              deleteIcon={<ArrowDropDown />}
-              onDelete={openMenu}
-              sx={{
-                ml: 2,
-                borderRadius: 999,
-                borderColor: ui.border,
-                color: ui.text,
-                cursor: "pointer",
-              }}
-            />
-
-            <Menu
-              anchorEl={anchorEl}
-              open={Boolean(anchorEl)}
-              onClose={closeMenu}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "center",
-              }}
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "center",
-              }}
-              PaperProps={{
-                sx: {
-                  mt: 1,
-                  minWidth: 180,
-                  borderRadius: 2,
-                  boxShadow: "0px 4px 12px rgba(0,0,0,0.08)",
-                },
-              }}
-            >
-              {spaces.map((space) => (
-                <MenuItem
-                  key={space}
-                  onClick={() => {
-                    setActiveSpace(space);
-                    closeMenu();
-                  }}
-                >
-                  {space}
-                </MenuItem>
-              ))}
-            </Menu>
-          </Box>
-        </Box>
-
-        {/* RIGHT SIDE: AUTO-SAVED + EXPORT + PROFILE MENU */}
-        <Box display="flex" alignItems="center" gap={2}>
-          <Button
-            variant="contained"
-            sx={{
-              bgcolor: ui.primary,
-              color: "white",
-              borderRadius: 999,
-              textTransform: "none",
-              px: 2.5,
-              fontSize: 12,
-              letterSpacing: 1,
-            }}
-          >
-            EXPORT PACKAGE
-          </Button>
-
-          {/* PROFILE MENU */}
-          <ProfileMenu />
-        </Box>
-      </Box>
+      <AppNavbar exportPackage={true} />
 
       {/* ================= MAIN LAYOUT ================= */}
       <Box
@@ -505,60 +410,73 @@ export default function DesignWorkspacePage() {
           </Box>
 
           {/* ========== BASELINE + CURRENT ITERATION (IMAGE-ACCURATE) ========== */}
-          <Grid container spacing={{ xs: 1.5, md: 2 }}>
+          <Grid container spacing={3} justifyContent="center">
+            {/* ================= BASELINE COLUMN ================= */}
             <Grid
-              size={{ xs: viewMode === "single" ? 12 : 6 }}
+              size={{ xs: 12, md: viewMode === "single" ? 12 : 6 }}
               sx={{
                 display: "flex",
-                justifyContent: viewMode === "single" ? "center" : "flex-start",
+                flexDirection: "column",
+                alignItems: "center",
               }}
             >
-              <Typography
+              {/* HEADER ROW */}
+              <Box
                 sx={{
-                  fontSize: 12,
-                  letterSpacing: 1,
-                  color: ui.muted,
-                  textTransform: "uppercase",
+                  width: "100%",
+                  maxWidth: 420,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 2,
                 }}
               >
-                BASELINE
-              </Typography>
-            </Grid>
-
-            {viewMode === "single" ? null : (
-              <Grid size={{ xs: 6 }}>
                 <Typography
                   sx={{
-                    fontSize: 12,
+                    fontSize: 16,
                     letterSpacing: 1,
-                    color: "#2563EB",
+                    color: "#000",
                     textTransform: "uppercase",
+                    fontWeight: 600,
                   }}
                 >
-                  CURRENT ITERATION
+                  BASELINE
                 </Typography>
-              </Grid>
-            )}
-            {/* ========== BASELINE CARD ========== */}
-            <Grid
-              size={{ xs: viewMode === "single" ? 12 : 6 }}
-              sx={{
-                display: "flex",
-                justifyContent: viewMode === "single" ? "center" : "flex-start",
-              }}
-            >
+
+                <FormControl size="small">
+                  <InputLabel>Select Space</InputLabel>
+                  <Select
+                    value={activeSpace}
+                    label="Select Space"
+                    onChange={(e) => setActiveSpace(e.target.value)}
+                    sx={{
+                      minWidth: { xs: 150, sm: 200 },
+                      bgcolor: "white",
+                      borderRadius: 2,
+                    }}
+                  >
+                    {spaces.map((space) => (
+                      <MenuItem key={space} value={space}>
+                        {space}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* BASELINE CARD */}
               <Card
                 onClick={() =>
                   toggleBaselineSelect(spaceImages[currentIndex].id)
                 }
                 sx={{
                   borderRadius: ui.cardRadius,
+                  width: "100%",
                   position: "relative",
-                  width: 420,
+                  maxWidth: 420,
                   aspectRatio: "4 / 3",
                   overflow: "hidden",
                   backgroundColor: "white",
-                  mx: viewMode === "single" ? "auto" : 0,
                   border: selectedBaselineIds?.includes(
                     spaceImages[currentIndex]?.id,
                   )
@@ -649,14 +567,44 @@ export default function DesignWorkspacePage() {
               </Card>
             </Grid>
 
-            {/* ========== CURRENT ITERATION ========== */}
+            {/* ================= CURRENT ITERATION ================= */}
             {viewMode === "compare" && currentImage && (
-              <Grid size={{ xs: 6 }}>
+              <Grid
+                size={{ xs: 12, md: 6 }}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: "100%",
+                    maxWidth: 420,
+                    mb: 3,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      mt: 1,
+                      fontSize: 16,
+                      letterSpacing: 1,
+                      color: "#2563EB",
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                      textAlign: "center",
+                    }}
+                  >
+                    CURRENT ITERATION
+                  </Typography>
+                </Box>
+
                 <Card
                   sx={{
-                    borderRadius: ui.cardRadius,
-                    width: 420,
+                    width: "100%",
+                    maxWidth: 420,
                     aspectRatio: "4 / 3",
+                    borderRadius: ui.cardRadius,
                     overflow: "hidden",
                     backgroundColor: "white",
                   }}
@@ -668,7 +616,6 @@ export default function DesignWorkspacePage() {
                       width: "100%",
                       height: "100%",
                       objectFit: "cover",
-                      borderRadius: ui.cardRadius,
                     }}
                   />
                 </Card>
@@ -727,7 +674,7 @@ export default function DesignWorkspacePage() {
               )}
             </Box>
 
-            {iterationHistory.length === 0 ? (
+            {iterationHistory?.length === 0 ? (
               <Paper
                 sx={{
                   p: 3,
@@ -807,7 +754,7 @@ export default function DesignWorkspacePage() {
 
           {/* ================= MARKET COMPS CAROUSEL ================= */}
 
-          {compsImages?.length ? (
+          {selectedImages?.length ? (
             <Box mt={4}>
               {/* HEADER + NAV BUTTONS */}
               <Box
@@ -816,6 +763,7 @@ export default function DesignWorkspacePage() {
                 justifyContent="space-between"
                 mb={2}
               >
+                {/* LEFT SIDE — TITLE */}
                 <Box display="flex" alignItems="center" gap={1}>
                   <CollectionsOutlined
                     fontSize="small"
@@ -824,7 +772,30 @@ export default function DesignWorkspacePage() {
                   <Typography fontWeight={600}>MARKET COMPS</Typography>
                 </Box>
 
-                <Box display="flex" gap={1}>
+                {/* RIGHT SIDE — SELECT + ARROWS */}
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  {/* SELECT */}
+                  <FormControl size="small">
+                    <InputLabel>Select Address</InputLabel>
+                    <Select
+                      value={selectedAddress}
+                      label="Select Address"
+                      onChange={(e) => setSelectedAddress(e.target.value)}
+                      sx={{
+                        minWidth: 260,
+                        bgcolor: "white",
+                        borderRadius: 2,
+                      }}
+                    >
+                      {Object.keys(compsImages?.addresses || {}).map((addr) => (
+                        <MenuItem key={addr} value={addr}>
+                          {addr}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* ARROWS */}
                   <IconButton
                     onClick={() =>
                       document.getElementById("comps-carousel")?.scrollBy({
@@ -887,7 +858,7 @@ export default function DesignWorkspacePage() {
                     "&::-webkit-scrollbar": { display: "none" },
                   }}
                 >
-                  {compsImages?.map((img: any, i: number) => (
+                  {selectedImages?.map((img: any, i: number) => (
                     <Card
                       key={i}
                       onClick={() => toggleCompsSelect(img.id)}

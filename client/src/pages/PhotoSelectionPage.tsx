@@ -14,7 +14,12 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-import { MoreHoriz, Check, ArrowForward } from "@mui/icons-material";
+import {
+  MoreHoriz,
+  ArrowForward,
+  EditOutlined,
+  DeleteOutline,
+} from "@mui/icons-material";
 import { useLocation, useParams } from "wouter";
 import { api } from "@/lib/api";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
@@ -69,13 +74,16 @@ export default function PhotoSelectionPage() {
     try {
       if (userId && propertyId) {
         const details = await api.getPropertyDetails(propertyId, userId);
-        const mlsImages = details?.images || [];
-
+        const mlsImages = details?.files?.mls_images?.images || [];
         const loadedPhotos = mlsImages?.map((file: any) => {
-          const roomCategory =
+          let roomCategory =
             file.category && file.category.includes("-")
               ? file.category.split("-").slice(1).join("-").trim()
               : file.category || "Unknown";
+
+          roomCategory =
+            roomCategory.charAt(0).toUpperCase() +
+            roomCategory.slice(1).toLowerCase();
 
           return {
             id: file?.id,
@@ -91,7 +99,7 @@ export default function PhotoSelectionPage() {
 
         // Set first category as default selection
         const firstCategory = loadedPhotos?.find(
-          (p) => p.roomCategory.toLowerCase() !== "unknown",
+          (p: any) => p.roomCategory.toLowerCase() !== "unknown",
         )?.roomCategory;
 
         if (firstCategory) setSelectedCategory(firstCategory);
@@ -104,14 +112,21 @@ export default function PhotoSelectionPage() {
   }, [propertyId, userId, showSnackbar]);
 
   const categoryData = Array.from(
-    new Set(photos.map((p) => p.roomCategory || "Unknown")),
+    new Map(
+      photos.map((p) => [
+        (p.roomCategory || "Unknown").toLowerCase(),
+        p.roomCategory || "Unknown",
+      ]),
+    ).values(),
   );
 
-  const dynamicCategories = categoryData?.map((cat) => ({
-    id: cat.toLowerCase().replace(/\s+/g, "_"),
-    label: cat,
-    count: photos.filter((p) => p.roomCategory === cat).length,
-  }));
+  const dynamicCategories = categoryData
+    .map((cat) => ({
+      id: cat.toLowerCase().replace(/\s+/g, "_"),
+      label: cat,
+      count: photos.filter((p) => p.roomCategory === cat).length,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   // --------- FILTER PHOTOS ----------
   const filteredPhotos = photos?.filter(
@@ -152,7 +167,7 @@ export default function PhotoSelectionPage() {
 
   return (
     <>
-      <AppNavbar propertyId={propertyId} showBack={true} bgcolor={ui.bg}/>
+      <AppNavbar propertyId={propertyId} showBack={true} bgcolor={ui.bg} />
 
       <Box
         sx={{
@@ -171,7 +186,8 @@ export default function PhotoSelectionPage() {
           elevation={0}
           sx={{
             width: 300,
-            p: 3,
+            py: 3,
+            pl: 3,
             backgroundColor: ui.bg,
             display: "flex",
             flexDirection: "column",
@@ -182,9 +198,11 @@ export default function PhotoSelectionPage() {
             sx={{
               fontSize: "12px",
               letterSpacing: 1,
-              color: ui.muted,
+              color: "#000",
               mb: 0.5,
+              pl: 1.5,
               textTransform: "uppercase",
+              fontWeight: 600,
             }}
           >
             ROOM BUCKETS
@@ -198,7 +216,6 @@ export default function PhotoSelectionPage() {
             sx={{
               flex: 1,
               overflowY: "auto",
-              pr: 1,
               "&::-webkit-scrollbar": { width: 6 },
               "&::-webkit-scrollbar-thumb": {
                 backgroundColor: ui.border,
@@ -207,12 +224,9 @@ export default function PhotoSelectionPage() {
             }}
           >
             {dynamicCategories?.map((cat) => {
-              const isActive = selectedCategory === cat.label;
-
               return (
                 <Box
                   key={cat.id}
-                  onClick={() => setSelectedCategory(cat.label)}
                   sx={{
                     display: "flex",
                     alignItems: "center",
@@ -221,26 +235,93 @@ export default function PhotoSelectionPage() {
                     py: 1.2,
                     borderRadius: 1,
                     cursor: "pointer",
-                    bgcolor: isActive ? "#0B1320" : "transparent",
-                    color: isActive ? "white" : ui.text,
+                    bgcolor:
+                      selectedCategory === cat.label
+                        ? "#0B1320"
+                        : "transparent",
+                    color: selectedCategory === cat.label ? "white" : ui.text,
+
                     "&:hover": {
-                      bgcolor: isActive ? "#0B1320" : "#f3f3f3",
+                      bgcolor:
+                        selectedCategory === cat.label ? "#0B1320" : "#f3f3f3",
+                    },
+
+                    "&:hover .action-icons": {
+                      opacity: 1,
+                      pointerEvents: "auto",
                     },
                   }}
                 >
-                  <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
-                    {cat.label}
-                  </Typography>
-
-                  <Typography
+                  {/* LEFT: Category name + count */}
+                  <Box
+                    onClick={() => setSelectedCategory(cat.label)}
+                    sx={{ flex: 1 }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 14,
+                        letterSpacing: 1,
+                        lineHeight: 1.3,
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {cat.label}{" "}
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: 14,
+                          color:
+                            selectedCategory === cat.label ? "#fff" : ui.muted,
+                          whiteSpace: "nowrap",
+                          display: "inline",
+                        }}
+                      >
+                        ({cat.count})
+                      </Typography>
+                    </Typography>
+                  </Box>
+                  {/* RIGHT: Edit & Delete icons — hidden by default */}
+                  <Box
+                    className="action-icons"
+                    display="flex"
+                    alignItems="center"
+                    gap={0.5}
                     sx={{
-                      fontSize: 12,
-                      color: isActive ? "white" : ui.muted,
-                      letterSpacing: 1,
+                      opacity: 0,
+                      pointerEvents: "none", // prevents clicking when hidden
+                      transition: "opacity 0.2s ease",
                     }}
                   >
-                    {cat.count}
-                  </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newName = prompt("Rename category:", cat.label);
+                        // if (newName) renameCategory(cat.label, newName);
+                      }}
+                      sx={{
+                        color:
+                          selectedCategory === cat.label ? "white" : ui.muted,
+                      }}
+                    >
+                      <EditOutlined fontSize="small" />
+                    </IconButton>
+
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // deleteCategory(cat.label);
+                      }}
+                      sx={{
+                        color:
+                          selectedCategory === cat.label ? "white" : ui.muted,
+                      }}
+                    >
+                      <DeleteOutline fontSize="small" />
+                    </IconButton>
+                  </Box>
                 </Box>
               );
             })}
@@ -259,7 +340,7 @@ export default function PhotoSelectionPage() {
               minHeight: "100%",
             }}
           >
-            <Box display="flex" alignItems="center" gap={1} mb={3}>
+            <Box display="flex" alignItems="flex-end" gap={1} mb={3}>
               <Typography
                 sx={{ fontSize: 20, fontWeight: 500, letterSpacing: 1 }}
               >
@@ -280,7 +361,7 @@ export default function PhotoSelectionPage() {
             </Box>
 
             <Grid container spacing={3}>
-              {filteredPhotos.map((photo) => (
+              {filteredPhotos?.map((photo) => (
                 <Grid key={photo.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                   <Card
                     onClick={() => toggleSelection(photo.id)}
@@ -289,9 +370,7 @@ export default function PhotoSelectionPage() {
                       cursor: "pointer",
                       borderRadius: ui.cardRadius,
                       boxShadow: "0px 2px 6px rgba(0,0,0,0.06)",
-                      border: 
-                       
-                         `1px solid ${ui.border}`,
+                      border: `1px solid ${ui.border}`,
                     }}
                   >
                     <CardMedia
@@ -305,30 +384,68 @@ export default function PhotoSelectionPage() {
                       }}
                     />
 
-                   
-
-                    <IconButton
+                    <Box
                       sx={{
                         position: "absolute",
                         top: 8,
                         right: 8,
-                        width: 28,
-                        height: 28,
-                        minWidth: 28,
-                        minHeight: 28,
-                        p: 0.5,
-                        bgcolor: "white",
-                        border: `1px solid ${ui.border}`,
-                        boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActivePhoto(photo.id);
-                        setMenuAnchor(e.currentTarget);
+                        display: "flex",
+                        gap: 0.8,
                       }}
                     >
-                      <MoreHoriz sx={{ color: ui.text }} />
-                    </IconButton>
+                      {/* DELETE BUTTON (DUSTBIN) */}
+                      <IconButton
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          minWidth: 28,
+                          minHeight: 28,
+                          p: 0.5,
+                          bgcolor: "white",
+                          border: `1px solid ${ui.border}`,
+                          boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
+                          "&:hover": {
+                            bgcolor: "#fff",
+                          },
+                          "&:hover .MuiSvgIcon-root": {
+                            color: "#000",
+                          },
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // deletePhoto(photo.id);
+                        }}
+                      >
+                        <DeleteOutline sx={{ color: ui.text, fontSize: 18 }} />
+                      </IconButton>
+
+                      {/* EXISTING 3 DOT MENU */}
+                      <IconButton
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          minWidth: 28,
+                          minHeight: 28,
+                          p: 0.5,
+                          bgcolor: "white",
+                          border: `1px solid ${ui.border}`,
+                          boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
+                          "&:hover": {
+                            bgcolor: "#fff",
+                          },
+                          "&:hover .MuiSvgIcon-root": {
+                            color: "#000",
+                          },
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePhoto(photo.id);
+                          setMenuAnchor(e.currentTarget);
+                        }}
+                      >
+                        <MoreHoriz sx={{ color: ui.text }} />
+                      </IconButton>
+                    </Box>
                   </Card>
                 </Grid>
               ))}
@@ -375,8 +492,8 @@ export default function PhotoSelectionPage() {
             onClick={handleContinue}
             endIcon={<ArrowForward />}
             sx={{
-              bgcolor: "#0B1320",
-              color: "white",
+              bgcolor: "#000",
+              color: "#fff",
               borderRadius: 999,
               textTransform: "uppercase",
               letterSpacing: 1,

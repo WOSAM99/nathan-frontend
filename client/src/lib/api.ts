@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://79fe-115-96-27-193.ngrok-free.app";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://10.0.1.178:8000";
 
 interface AuthTokens {
   access_token: string;
@@ -38,7 +37,7 @@ interface Project {
   drafts_ready?: number;
   city?: string;
   state?: string;
-  status?:string
+  status?: string;
 }
 
 interface PropertyImage {
@@ -50,18 +49,26 @@ interface PropertyImage {
   file_type?: string;
   category?: string;
   url?: string; // Optional if available directly
+  images: {
+    category: string;
+    filename: string;
+    id: string;
+    mime_type: string;
+    page: number;
+    url: string;
+  }[];
+  addresses: any[];
 }
 
 interface PropertyDetails {
   property_id: string;
   user_id: string;
   // Backend returns separate lists
-  mls_images: PropertyImage[];
-  comps_images: PropertyImage[];
+  files: { mls_images: PropertyImage; comps_images: PropertyImage };
   pdf_urls: string[];
   created_at: string;
   chat_history: any[];
-  images:any[]
+  images: any[];
 }
 
 interface Room {
@@ -82,7 +89,7 @@ interface Iteration {
 
 interface ChatRegenerateRequest {
   property_id: string;
-  image_ids: string[];
+  images: Record<string, string>;
   user_feedback: string;
 }
 
@@ -131,7 +138,7 @@ class ApiClient {
 
     // Add Authorization header if token exists
     if (this.accessToken) {
-      headers["Authorization"] = `Bearer ${this.accessToken}`;  
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
       console.log(
         `[API] Authorization header set:`,
         headers["Authorization"].substring(0, 30) + "...",
@@ -165,7 +172,10 @@ class ApiClient {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true",   },
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
         credentials: "include", // Send HttpOnly cookie automatically
         // No body - backend uses cookie
       });
@@ -231,33 +241,35 @@ class ApiClient {
     }
   }
 
-async getProjects(user_id: string): Promise<Project[]> {
-  const response = await this.request<any[]>(
-    `/doc/projects?user_id=${user_id}`
-  );
+  async getProjects(user_id: string): Promise<Project[]> {
+    const response = await this.request<any[]>(
+      `/doc/projects?user_id=${user_id}`,
+    );
 
-  return response.map((p) => {
-    // Correct way to get FIRST MLS IMAGE
-    const firstMlsImage =
-      p.files?.mls?.images?.[0]?.url || undefined;
+    return response.map((p) => {
+      // Correct way to get FIRST MLS IMAGE
+      const firstMlsImage = p.files?.mls?.images?.[0]?.url || undefined;
 
-    return {
-      property_id: p.property_id,
-      user_id: p.user_id,
-      created_at: p.created_at,
-      total_images: p.files?.mls?.total_images || 0,
-      thumbnail_url: firstMlsImage,
-      pdf_urls: p.pdf_urls || [],
-      files: p.files, 
-    };
-  });
-}
+      return {
+        property_id: p.property_id,
+        user_id: p.user_id,
+        created_at: p.created_at,
+        total_images: p.files?.mls?.total_images || 0,
+        thumbnail_url: firstMlsImage,
+        pdf_urls: p.pdf_urls || [],
+        files: p.files,
+      };
+    });
+  }
 
-async getPropertyDetails(propertyId: string, userId: string): Promise<PropertyDetails> {
-  const query = `?property_id=${propertyId}&user_id=${userId}`;
+  async getPropertyDetails(
+    propertyId: string,
+    userId: string,
+  ): Promise<PropertyDetails> {
+    const query = `?property_id=${propertyId}&user_id=${userId}`;
 
-  return this.request<PropertyDetails>(`/doc/property${query}`);
-}
+    return this.request<PropertyDetails>(`/doc/property${query}`);
+  }
 
   async uploadPDF(
     files: File[],
@@ -323,11 +335,11 @@ async getPropertyDetails(propertyId: string, userId: string): Promise<PropertyDe
     property_id: string,
     image_id: string,
     category: string,
-    user_id:string
+    user_id: string,
   ): Promise<any> {
     return this.request(`/doc/image/category`, {
       method: "PUT",
-      body: JSON.stringify({ category,property_id ,image_id,user_id}),
+      body: JSON.stringify({ category, property_id, image_id, user_id }),
     });
   }
 
