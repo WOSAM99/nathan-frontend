@@ -1,100 +1,41 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
-
-  /* Architectural Minimalist Palette */
-  /* Primary: #1a1a1a (Black/Dark Charcoal) */
-  --color-primary: hsl(0 0% 10%); 
-  --color-primary-foreground: hsl(0 0% 100%);
-
-  /* Secondary: #f3f4f6 (Light Gray) */
-  --color-secondary: hsl(220 14% 96%);
-  --color-secondary-foreground: hsl(220 13% 10%);
-
-  /* Accent: #2563eb (Blue) */
-  --color-accent: hsl(221 83% 53%);
-  --color-accent-foreground: hsl(0 0% 100%);
-
-  /* Background: #f8f9fa (Off-white) */
-  --color-background: hsl(210 20% 98%);
-  --color-foreground: hsl(220 13% 10%);
-
-  /* Surface: #ffffff (White) */
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(220 13% 10%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(220 13% 10%);
-
-  /* Functional Colors */
-  --color-muted: hsl(220 14% 96%);
-  --color-muted-foreground: hsl(220 9% 46%); /* Text Secondary #9ca3af */
-  
-  --color-destructive: hsl(0 84% 60%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-
-  --color-border: hsl(220 13% 91%); /* #e5e7eb */
-  --color-input: hsl(220 13% 91%);
-  --color-ring: hsl(221 83% 53%);
-
-  --color-sidebar: hsl(0 0% 100%);
-  --color-sidebar-foreground: hsl(220 13% 10%);
-  --color-sidebar-primary: hsl(0 0% 10%);
-  --color-sidebar-primary-foreground: hsl(0 0% 98%);
-  --color-sidebar-accent: hsl(220 14% 96%);
-  --color-sidebar-accent-foreground: hsl(220 13% 10%);
-  --color-sidebar-border: hsl(220 13% 91%);
-  --color-sidebar-ring: hsl(215 27.9% 16.9%);
-
-  --font-sans: 'Inter', sans-serif;
-  
-  --radius: 0.75rem;
-
-  /* Custom Shadows */
-  --shadow-subtle: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-strong: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+/* CSS Reset and Base Styles */
+* {
+  box-sizing: border-box;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply font-sans antialiased bg-background text-foreground;
-  }
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  /* Prevent horizontal scrollbar */
 }
 
-@layer utilities {
-  .text-xxs {
-    font-size: 10px;
-    line-height: 1.5;
-  }
-  
-  .tracking-architectural {
-    letter-spacing: 0.1em;
-  }
+/* Ensure typography inherits correctly if not covered by MUI */
+body {
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  /* Architectural specific utilities */
-  .architectural-label {
-    @apply text-[10px] uppercase tracking-widest font-bold text-muted-foreground;
-  }
+/* Optional: Scrollbar styling to match a modern feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-  .architectural-card {
-    @apply bg-card border border-border rounded-2xl shadow-[var(--shadow-subtle)] transition-all duration-300;
-  }
-  
-  .architectural-card:hover {
-    @apply shadow-[var(--shadow-strong)] -translate-y-[2px];
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-  .architectural-input {
-    @apply bg-[#f9fafb] border-border focus:border-ring/30 focus:ring-0 rounded-lg px-4 py-3 transition-colors;
-  }
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

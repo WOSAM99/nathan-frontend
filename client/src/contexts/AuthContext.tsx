@@ -1,6 +1,12 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api, LoginRequest, RegisterRequest } from '@/lib/api';
-import { useLocation } from 'wouter';
+import { LoginRequest, RegisterRequest, api } from "@/lib/api";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { useLocation } from "wouter";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -20,8 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
   const [userId, setUserId] = useState<string | null>(null);
 
-
- useEffect(() => {
+  useEffect(() => {
     const savedUserId = localStorage.getItem("user_id");
     if (savedUserId) {
       setUserId(savedUserId);
@@ -32,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (data: LoginRequest) => {
-    const res = await api.login(data); 
+    const res = await api.login(data);
     setUserId(res.user_id);
     localStorage.setItem("user_id", res.user_id);
 
@@ -43,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (data: RegisterRequest) => {
     await api.register(data);
     setIsAuthenticated(true);
-    setLocation('/dashboard');
+    setLocation("/dashboard");
   };
 
   const logout = async () => {
@@ -55,8 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, login, register, logout, userId, 
-    setUserId, }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        isLoading,
+        login,
+        register,
+        logout,
+        userId,
+        setUserId,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -65,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

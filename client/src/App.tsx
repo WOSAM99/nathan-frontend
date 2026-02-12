@@ -1,9 +1,9 @@
 import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { CssBaseline } from "@mui/material";
+import { queryClient } from "@/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
-import NotFound from "@/pages/not-found";
+import NotFoundPage from "@/pages/NotFoundPage";
 import { SnackbarProvider } from "notistack";
 
 import AuthPage from "@/pages/AuthPage";
@@ -20,10 +20,9 @@ function Router() {
       <Route path="/" component={AuthPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/new-project" component={ProjectSetupPage} />
-      <Route path="/organize" component={PhotoSelectionPage} />
       <Route path="/organize/:id" component={PhotoSelectionPage} />
       <Route path="/studio/:id" component={DesignWorkspacePage} />
-      <Route component={NotFound} />
+      <Route component={NotFoundPage} />
     </Switch>
   );
 }
@@ -32,6 +31,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
+        <CssBaseline />
         <SnackbarProvider
           maxSnack={3}
           autoHideDuration={3000}
@@ -39,9 +39,7 @@ function App() {
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <AuthProvider>
-            <TooltipProvider>
-              <Router />
-            </TooltipProvider>
+            <Router />
           </AuthProvider>
         </SnackbarProvider>
       </ThemeProvider>
