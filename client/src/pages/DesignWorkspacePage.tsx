@@ -28,6 +28,7 @@ import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import CollectionsOutlined from "@mui/icons-material/CollectionsOutlined";
 import History from "@mui/icons-material/History";
 import AppNavbar from "@/components/AppNavBar";
+import { PropertyDetails } from "@/types";
 
 /* ================= DESIGN TOKENS ================= */
 const ui = {
