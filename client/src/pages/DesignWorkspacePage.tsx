@@ -350,14 +350,16 @@ export default function DesignWorkspacePage() {
             {/* LEFT SIDE — TITLE + SUBTITLE */}
             <Box>
               <Typography
-                variant="h5"
                 fontWeight={500}
-                sx={{ letterSpacing: 1 }}
+                sx={{ letterSpacing: 1, fontSize: 22 }}
               >
                 {`${activeSpace} Transformation`}
               </Typography>
 
-              <Typography color={ui.muted} sx={{ fontSize: 14 }}>
+              <Typography
+                color={ui.muted}
+                sx={{ fontSize: 14, letterSpacing: 1 }}
+              >
                 ITERATIVE DELTA ANALYSIS
               </Typography>
             </Box>
@@ -630,7 +632,12 @@ export default function DesignWorkspacePage() {
             >
               <Box display="flex" alignItems="center" gap={1}>
                 <History fontSize="small" sx={{ color: ui.muted }} />
-                <Typography fontWeight={600}>ITERATION HISTORY</Typography>
+                <Typography
+                  fontWeight={600}
+                  sx={{ fontSize: 16, letterSpacing: 1 }}
+                >
+                  ITERATION HISTORY
+                </Typography>
               </Box>
 
               {iterationHistory.length > 0 && (
@@ -767,7 +774,12 @@ export default function DesignWorkspacePage() {
                     fontSize="small"
                     sx={{ color: ui.muted }}
                   />
-                  <Typography fontWeight={600}>MARKET COMPS</Typography>
+                  <Typography
+                    fontWeight={600}
+                    sx={{ fontSize: 16, letterSpacing: 1 }}
+                  >
+                    MARKET COMPS
+                  </Typography>
                 </Box>
 
                 {/* RIGHT SIDE — SELECT + ARROWS */}
@@ -930,7 +942,10 @@ export default function DesignWorkspacePage() {
             {/* HEADER */}
             <Box display="flex" gap={1} alignItems="center" sx={{ mb: 2 }}>
               <AutoAwesome fontSize="small" sx={{ color: "#000" }} />
-              <Typography fontWeight={700} letterSpacing={1}>
+              <Typography
+                fontWeight={700}
+                sx={{ fontSize: 16, letterSpacing: 1 }}
+              >
                 DESIGN AGENT
               </Typography>
             </Box>

@@ -158,7 +158,7 @@ const { showSnackbar } = useAppSnackbar();
           }}
         />
 
-        <Typography variant="overline" sx={{ letterSpacing: 2 }}>
+        <Typography variant="overline" sx={{ letterSpacing: 2, fontSize: 14 }}>
           DESIGN AI WORKSPACE
         </Typography>
 
@@ -280,7 +280,7 @@ const { showSnackbar } = useAppSnackbar();
             gap: 0.5,
           }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <Typography sx={{ fontSize: 14 }} color="text.secondary">
             {isRegisterMode
               ? "Already have an account?"
               : "Don't have an account?"}{" "}
@@ -302,18 +302,6 @@ const { showSnackbar } = useAppSnackbar();
           </Link>
         </Stack>
       </Paper>
-
-      <Typography
-        variant="caption"
-        sx={{
-          mt: 2,
-          letterSpacing: 2,
-          opacity: 0.5,
-          fontSize: { xs: "9px", sm: "10px" },
-        }}
-      >
-        HIGH-END INTERIOR WORKSPACE v1.0
-      </Typography>
     </Box>
   );
 }

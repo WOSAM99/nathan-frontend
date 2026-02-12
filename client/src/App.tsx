@@ -11,6 +11,8 @@ import DashboardPage from "@/pages/DashboardPage";
 import ProjectSetupPage from "@/pages/ProjectSetupPage";
 import PhotoSelectionPage from "@/pages/PhotoSelectionPage";
 import DesignWorkspacePage from "@/pages/DesignWorkspacePage";
+import { ThemeProvider } from "@mui/material";
+import { theme } from "./theme";
 
 function Router() {
   return (
@@ -29,18 +31,20 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SnackbarProvider
-        maxSnack={3}
-        autoHideDuration={3000}
-        hideIconVariant
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <AuthProvider>
-          <TooltipProvider>
-            <Router />
-          </TooltipProvider>
-        </AuthProvider>
-      </SnackbarProvider>
+      <ThemeProvider theme={theme}>
+        <SnackbarProvider
+          maxSnack={3}
+          autoHideDuration={3000}
+          hideIconVariant
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <AuthProvider>
+            <TooltipProvider>
+              <Router />
+            </TooltipProvider>
+          </AuthProvider>
+        </SnackbarProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

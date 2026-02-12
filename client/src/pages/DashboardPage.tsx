@@ -99,7 +99,7 @@ export default function DashboardPage() {
         </Box>
 
         {/* SEARCH + FILTER */}
-        <Box display="flex" alignItems="center" gap={1.5}>
+        {/* <Box display="flex" alignItems="center" gap={1.5}>
           <TextField
             placeholder="Search addresses..."
             size="small"
@@ -144,7 +144,7 @@ export default function DashboardPage() {
           >
             <FilterListIcon sx={{ color: "#555", fontSize: 18 }} />
           </IconButton>
-        </Box>
+        </Box> */}
       </Box>
 
       {/* ===== PROJECT GRID ===== */}

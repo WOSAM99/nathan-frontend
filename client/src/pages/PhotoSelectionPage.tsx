@@ -196,7 +196,7 @@ export default function PhotoSelectionPage() {
         >
           <Typography
             sx={{
-              fontSize: "12px",
+              fontSize: 14,
               letterSpacing: 1,
               color: "#000",
               mb: 0.5,
