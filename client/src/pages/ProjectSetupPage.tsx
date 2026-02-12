@@ -1,11 +1,5 @@
-import { useState, useRef } from "react";
-import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  IconButton,
-} from "@mui/material";
+import { useState, useRef, useCallback } from "react";
+import { Box, Typography, Button, TextField, IconButton } from "@mui/material";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -16,38 +10,48 @@ import AppNavbar from "@/components/AppNavBar";
 
 export default function ProjectSetupPage() {
   const { showSnackbar } = useAppSnackbar();
-
   const [, setLocation] = useLocation();
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [mlsFiles, setMlsFiles] = useState<File[]>([]);
   const [compFiles, setCompFiles] = useState<File[]>([]);
-  const [notes, setNotes] = useState("");
 
   const mlsInputRef = useRef<HTMLInputElement>(null);
   const compInputRef = useRef<HTMLInputElement>(null);
 
-  const handleMlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const handleMlsUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
 
-    setMlsFiles((prev) => [...prev, ...Array.from(files)]);
-  };
+      setMlsFiles((prev) => [...prev, ...Array.from(files)]);
+    },
+    [],
+  );
 
-  const handleCompUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const handleCompUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
 
-    setCompFiles((prev) => [...prev, ...Array.from(files)]);
-  };
+      setCompFiles((prev) => [...prev, ...Array.from(files)]);
+    },
+    [],
+  );
 
-  const removeMlsFile = (index: number) =>
-    setMlsFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeMlsFile = useCallback(
+    (index: number) =>
+      setMlsFiles((prev) => prev.filter((_, i) => i !== index)),
+    [],
+  );
 
-  const removeCompFile = (index: number) =>
-    setCompFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeCompFile = useCallback(
+    (index: number) =>
+      setCompFiles((prev) => prev.filter((_, i) => i !== index)),
+    [],
+  );
 
-  const uploadSequence = async () => {
+  const uploadSequence = useCallback(async () => {
     let currentPropId = "new";
 
     if (mlsFiles.length > 0) {
@@ -61,15 +65,15 @@ export default function ProjectSetupPage() {
     }
 
     return currentPropId;
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (mlsFiles.length === 0) {
-    showSnackbar("Please upload MLS Listing PDF", "error");
-    return;
-  }
+      showSnackbar("Please upload MLS Listing PDF", "error");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -83,7 +87,7 @@ export default function ProjectSetupPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, []);
 
   return (
     <Box
@@ -183,7 +187,7 @@ export default function ProjectSetupPage() {
               </Box>
             ) : (
               <Box>
-                {mlsFiles.map((file, i) => (
+                {mlsFiles?.map((file, i) => (
                   <Box
                     key={i}
                     display="flex"
@@ -196,7 +200,7 @@ export default function ProjectSetupPage() {
                     bgcolor="#fff"
                   >
                     <Typography noWrap sx={{ fontSize: 12, letterSpacing: 1 }}>
-                      {file.name}
+                      {file?.name}
                     </Typography>
 
                     <IconButton onClick={() => removeMlsFile(i)}>
@@ -239,9 +243,9 @@ export default function ProjectSetupPage() {
               onChange={handleCompUpload}
             />
 
-            {compFiles.length === 0 ? (
+            {compFiles?.length === 0 ? (
               <Box
-                onClick={() => compInputRef.current?.click()}
+                onClick={() => compInputRef?.current?.click()}
                 sx={{
                   border: "1px dashed #ddd",
                   borderRadius: 3,
@@ -274,7 +278,7 @@ export default function ProjectSetupPage() {
                     bgcolor="#fff"
                   >
                     <Typography noWrap sx={{ fontSize: 12, letterSpacing: 1 }}>
-                      {file.name}
+                      {file?.name}
                     </Typography>
 
                     <IconButton onClick={() => removeCompFile(i)}>
@@ -286,7 +290,7 @@ export default function ProjectSetupPage() {
                 <Button
                   variant="outlined"
                   fullWidth
-                  onClick={() => compInputRef.current?.click()}
+                  onClick={() => compInputRef?.current?.click()}
                 >
                   Add another file
                 </Button>
@@ -301,7 +305,8 @@ export default function ProjectSetupPage() {
             type="submit"
             form="project-setup-form"
             disabled={
-              isSubmitting || (mlsFiles.length === 0 && compFiles.length === 0)
+              isSubmitting ||
+              (mlsFiles?.length === 0 && compFiles?.length === 0)
             }
             startIcon={
               isSubmitting ? (

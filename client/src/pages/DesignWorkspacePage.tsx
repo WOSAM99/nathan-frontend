@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -15,7 +15,7 @@ import {
   Select,
 } from "@mui/material";
 import { useRoute } from "wouter";
-import { api, PropertyDetails } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { MenuItem } from "@mui/material";
@@ -47,74 +47,73 @@ export default function DesignWorkspacePage() {
   const [, params] = useRoute("/studio/:id");
   const propertyId = params?.id || "";
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const [propertyDetails, setPropertyDetails] =
     useState<PropertyDetails | null>(null);
-  const [activeSpace, setActiveSpace] = useState("Kitchen");
+  const [activeSpace, setActiveSpace] = useState<string>("Kitchen");
   const [spaces, setSpaces] = useState<string[]>([]);
-  const [inputText, setInputText] = useState("");
+  const [inputText, setInputText] = useState<string>("");
   const [messages, setMessages] = useState<{ sender: string; text: string }[]>(
     [],
   );
   const [viewMode, setViewMode] = useState<"compare" | "single">("single");
   const [spaceImages, setSpaceImages] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [compsImages, setCompsImages] = useState<any>();
   const [selectedBaselineIds, setSelectedBaselineIds] = useState<string[]>([]);
   const [selectedCompsIds, setSelectedCompsIds] = useState<string[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [iterationHistory, setIterationHistory] = useState<
     { v: string; url: string; description: string }[]
   >([]);
-  const [versionCounter, setVersionCounter] = useState(1.1);
+  const [versionCounter, setVersionCounter] = useState<number>(1.1);
   const [selectedAddress, setSelectedAddress] = useState<string>("");
 
-  const toggleBaselineSelect = (id: string) => {
+  const selectedImages = useMemo(
+    () => compsImages?.addresses?.[selectedAddress]?.images || [],
+    [],
+  );
+
+  const toggleBaselineSelect = useCallback((id: string) => {
     setSelectedBaselineIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
-  };
+  }, []);
 
-  const toggleCompsSelect = (id: string) => {
+  const toggleCompsSelect = useCallback((id: string) => {
     setSelectedCompsIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
-  };
+  }, []);
 
-  const handleViewMode = (
-    _event: React.MouseEvent<HTMLElement>,
-    newMode: "compare" | "single" | null,
-  ) => {
-    if (newMode) setViewMode(newMode);
-  };
+  const handleViewMode = useCallback(
+    (
+      _event: React.MouseEvent<HTMLElement>,
+      newMode: "compare" | "single" | null,
+    ) => {
+      if (newMode) setViewMode(newMode);
+    },
+    [],
+  );
 
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollToBottom = useCallback(() => {
+    chatEndRef?.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleNext = (e: any) => {
+  const handleNext = useCallback((e: any) => {
     e.stopPropagation();
     setCurrentIndex((prev) => (prev < spaceImages?.length - 1 ? prev + 1 : 0));
-  };
+  }, []);
 
-  const handlePrev = (e: any) => {
+  const handlePrev = useCallback((e: any) => {
     e.stopPropagation();
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : spaceImages?.length - 1));
-  };
+  }, []);
 
-  useEffect(() => {
-    setCurrentIndex(0);
-  }, [activeSpace]);
-
-  const handleExecute = async () => {
-    if (selectedBaselineIds.length === 0 && selectedCompsIds.length === 0) {
+  const handleExecute = useCallback(async () => {
+    if (selectedBaselineIds?.length === 0 && selectedCompsIds?.length === 0) {
       showSnackbar(
         "Please select at least one image (Baseline or Market Comps) to generate a new design",
         "warning",
@@ -122,7 +121,7 @@ export default function DesignWorkspacePage() {
       return;
     }
 
-    if (!inputText.trim()) return;
+    if (!inputText?.trim()) return;
 
     const userMessage = inputText;
 
@@ -141,18 +140,18 @@ export default function DesignWorkspacePage() {
     const images: Record<string, string> = {};
 
     // Baseline images
-    selectedBaselineIds.forEach((id) => {
-      const img = spaceImages.find((i) => i.id === id);
+    selectedBaselineIds?.forEach((id) => {
+      const img = spaceImages?.find((i) => i.id === id);
       if (img) {
-        images[id] = img.category || activeSpace;
+        images[id] = img?.category || activeSpace;
       }
     });
 
     // Comps images
-    selectedCompsIds.forEach((id) => {
-      const img = selectedImages.find((i: any) => i.id === id);
+    selectedCompsIds?.forEach((id) => {
+      const img = selectedImages?.find((i: any) => i.id === id);
       if (img) {
-        images[id] = img.category || selectedAddress;
+        images[id] = img?.category || selectedAddress;
       }
     });
 
@@ -166,7 +165,7 @@ export default function DesignWorkspacePage() {
     try {
       const res = await api.regenerateDesign(payload);
 
-      const newImageUrl = res.regenerated_images?.[0]?.url;
+      const newImageUrl = res?.regenerated_images?.[0]?.url;
 
       if (!newImageUrl) {
         throw new Error("No image returned");
@@ -207,96 +206,106 @@ export default function DesignWorkspacePage() {
       setMessages((prev) => prev.slice(0, -1));
       showSnackbar("Failed to regenerate design", "error");
     }
-  };
+  }, [
+    userId,
+    propertyId,
+    selectedAddress,
+    selectedBaselineIds,
+    selectedCompsIds,
+    versionCounter,
+  ]);
+
+  const loadDetails = useCallback(async () => {
+    try {
+      const details = await api?.getPropertyDetails(propertyId, String(userId));
+
+      setPropertyDetails(details);
+
+      // ---------- GET MLS IMAGES ----------
+      const mlsImages = details?.files?.mls_images?.images || [];
+
+      // ---------- EXTRACT SPACES (KEEP UNKNOWN) ----------
+      const extractedSpaces: string[] = Array.from(
+        new Set(
+          mlsImages.map((img: any) => {
+            const cat = img?.category as string | undefined;
+
+            return cat && cat?.includes("-")
+              ? cat.split("-").slice(1).join("-").trim()
+              : cat || "Unknown";
+          }),
+        ),
+      );
+
+      // Sort alphabetically
+      extractedSpaces?.sort();
+
+      // Move "Unknown" to the bottom if present
+      const unknownIndex = extractedSpaces?.indexOf("unknown");
+      if (unknownIndex !== -1) {
+        extractedSpaces?.splice(unknownIndex, 1);
+        extractedSpaces?.push("Unknown");
+      }
+
+      const finalSpaces =
+        extractedSpaces?.length > 0
+          ? extractedSpaces
+          : ["Kitchen", "Living Room"];
+
+      setSpaces(finalSpaces);
+
+      // ---------- GROUP IMAGES BY ROOM (INCLUDING UNKNOWN) ----------
+      const groupedImages: Record<string, any[]> = {};
+
+      mlsImages?.forEach((img: any) => {
+        let room =
+          img?.category && img?.category?.includes("-")
+            ? img?.category.split("-").slice(1).join("-").trim()
+            : img?.category || "Unknown";
+
+        if (!groupedImages[room]) groupedImages[room] = [];
+        groupedImages[room]?.push(img);
+      });
+
+      // ---------- SET DEFAULT IMAGES ----------
+      const firstSpace = finalSpaces[0];
+
+      setSpaceImages(groupedImages[firstSpace] || mlsImages);
+
+      setActiveSpace(firstSpace);
+
+      // ---------- STORE COMPS IMAGES ----------
+      const comps = details?.files?.comps_images || [];
+      setCompsImages(comps);
+
+      const firstAddress = comps ? Object.keys(comps?.addresses)[0] : "";
+      setSelectedAddress(firstAddress);
+    } catch (err) {
+      showSnackbar("Failed to load property details", "error");
+    }
+  }, [userId, propertyId]);
 
   useEffect(() => {
-    if (iterationHistory.length === 0) {
-      setViewMode("single");
-    }
-  }, [iterationHistory]);
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [activeSpace]);
 
   useEffect(() => {
     if (!propertyId || !userId) {
       return;
     }
 
-    const loadDetails = async () => {
-      try {
-        const details = await api?.getPropertyDetails(propertyId, userId);
-
-        setPropertyDetails(details);
-
-        // ---------- GET MLS IMAGES ----------
-        const mlsImages = details?.files?.mls_images?.images || [];
-
-        // ---------- EXTRACT SPACES (KEEP UNKNOWN) ----------
-        const extractedSpaces: string[] = Array.from(
-          new Set(
-            mlsImages.map((img: any) => {
-              const cat = img?.category as string | undefined;
-
-              return cat && cat.includes("-")
-                ? cat.split("-").slice(1).join("-").trim()
-                : cat || "Unknown";
-            }),
-          ),
-        );
-
-        // Sort alphabetically
-        extractedSpaces?.sort();
-
-        // Move "Unknown" to the bottom if present
-        const unknownIndex = extractedSpaces?.indexOf("unknown");
-        if (unknownIndex !== -1) {
-          extractedSpaces?.splice(unknownIndex, 1);
-          extractedSpaces?.push("Unknown");
-        }
-
-        const finalSpaces =
-          extractedSpaces?.length > 0
-            ? extractedSpaces
-            : ["Kitchen", "Living Room"];
-
-        setSpaces(finalSpaces);
-
-        // ---------- GROUP IMAGES BY ROOM (INCLUDING UNKNOWN) ----------
-        const groupedImages: Record<string, any[]> = {};
-
-        mlsImages?.forEach((img: any) => {
-          let room =
-            img.category && img.category.includes("-")
-              ? img.category.split("-").slice(1).join("-").trim()
-              : img.category || "Unknown";
-
-          if (!groupedImages[room]) groupedImages[room] = [];
-          groupedImages[room]?.push(img);
-        });
-
-        // ---------- SET DEFAULT IMAGES ----------
-        const firstSpace = finalSpaces[0];
-
-        setSpaceImages(groupedImages[firstSpace] || mlsImages);
-
-        setActiveSpace(firstSpace);
-
-        // ---------- STORE COMPS IMAGES ----------
-        const comps = details?.files?.comps_images || [];
-        setCompsImages(comps);
-
-        const firstAddress = comps ? Object.keys(comps?.addresses)[0] : "";
-        setSelectedAddress(firstAddress);
-        console.log(
-          firstAddress,
-          "firstAddressfirstAddressfirstAddressfirstAddress",
-        );
-        // setSelectedAddress(firstAddress);
-      } catch (err) {
-        showSnackbar("Failed to load property details", "error");
-      }
-    };
-
     loadDetails();
   }, [userId, propertyId]);
+
+  useEffect(() => {
+    if (iterationHistory?.length === 0) {
+      setViewMode("single");
+    }
+  }, [iterationHistory]);
 
   useEffect(() => {
     if (!propertyDetails) return;
@@ -307,8 +316,8 @@ export default function DesignWorkspacePage() {
       const raw = img?.category || "";
 
       const room =
-        raw && raw.includes("-")
-          ? raw.split("-").slice(1).join("-").trim()
+        raw && raw?.includes("-")
+          ? raw?.split("-").slice(1).join("-").trim()
           : raw;
 
       return room?.toLowerCase() === activeSpace?.toLowerCase();
@@ -316,9 +325,6 @@ export default function DesignWorkspacePage() {
 
     setSpaceImages(imagesForSpace);
   }, [propertyDetails, activeSpace]);
-
-  const selectedImages =
-    compsImages?.addresses?.[selectedAddress]?.images || [];
 
   return (
     <Box minHeight="100vh" bgcolor={ui.bg}>
@@ -401,7 +407,7 @@ export default function DesignWorkspacePage() {
             >
               <ToggleButton
                 value="compare"
-                disabled={iterationHistory.length === 0}
+                disabled={iterationHistory?.length === 0}
               >
                 COMPARE
               </ToggleButton>
@@ -409,7 +415,7 @@ export default function DesignWorkspacePage() {
             </ToggleButtonGroup>
           </Box>
 
-          {/* ========== BASELINE + CURRENT ITERATION (IMAGE-ACCURATE) ========== */}
+          {/* ========== BASELINE + CURRENT ITERATION ========== */}
           <Grid container spacing={3} justifyContent="center">
             {/* ================= BASELINE COLUMN ================= */}
             <Grid
@@ -467,7 +473,7 @@ export default function DesignWorkspacePage() {
               {/* BASELINE CARD */}
               <Card
                 onClick={() =>
-                  toggleBaselineSelect(spaceImages[currentIndex].id)
+                  toggleBaselineSelect(spaceImages[currentIndex]?.id)
                 }
                 sx={{
                   borderRadius: ui.cardRadius,
@@ -489,7 +495,7 @@ export default function DesignWorkspacePage() {
                   <>
                     <CardMedia
                       component="img"
-                      image={spaceImages[currentIndex].url}
+                      image={spaceImages[currentIndex]?.url}
                       sx={{
                         width: "100%",
                         height: "100%",
@@ -542,7 +548,7 @@ export default function DesignWorkspacePage() {
                     </IconButton>
 
                     <Chip
-                      label={`${currentIndex + 1} / ${spaceImages.length}`}
+                      label={`${currentIndex + 1} / ${spaceImages?.length}`}
                       sx={{
                         position: "absolute",
                         bottom: 16,
@@ -640,7 +646,7 @@ export default function DesignWorkspacePage() {
                 </Typography>
               </Box>
 
-              {iterationHistory.length > 0 && (
+              {iterationHistory?.length > 0 && (
                 <Box display="flex" gap={1}>
                   <IconButton
                     onClick={() =>
@@ -996,7 +1002,7 @@ export default function DesignWorkspacePage() {
                         border: `1px solid ${ui.border}`,
                         bgcolor: "#F3F5F7",
                         maxWidth: "85%",
-                        ...(isGenerating && index === messages.length - 1
+                        ...(isGenerating && index === messages?.length - 1
                           ? {
                               animation: "blink 1.2s infinite",
                               "@keyframes blink": {
@@ -1008,7 +1014,7 @@ export default function DesignWorkspacePage() {
                           : {}),
                       }}
                     >
-                      {msg.text}
+                      {msg?.text}
                     </Paper>
                   </Box>
                 ) : (
@@ -1023,7 +1029,7 @@ export default function DesignWorkspacePage() {
                       maxWidth: "85%",
                     }}
                   >
-                    {msg.text}
+                    {msg?.text}
                   </Paper>
                 ),
               )}

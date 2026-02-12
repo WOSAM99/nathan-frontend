@@ -1,104 +1,14 @@
+import {
+  AuthTokens,
+  ChatRegenerateRequest,
+  ChatRegenerateResponse,
+  LoginRequest,
+  Project,
+  PropertyDetails,
+  RegisterRequest,
+} from "@/types";
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://10.0.1.178:8000";
-
-interface AuthTokens {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  user_id: string;
-}
-
-interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-interface RegisterRequest {
-  email: string;
-  password: string;
-  full_name: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
-
-interface Project {
-  property_id: string;
-  user_id?: string;
-  created_at?: string;
-  total_images?: number;
-  thumbnail_url?: string;
-  pdf_urls?: string[];
-  project_address?: string;
-  days_left?: number;
-  roi_percent?: number;
-  drafts_ready?: number;
-  city?: string;
-  state?: string;
-  status?: string;
-}
-
-interface PropertyImage {
-  id: string;
-  filename: string;
-  page: number;
-  caption: string;
-  mime_type: string;
-  file_type?: string;
-  category?: string;
-  url?: string; // Optional if available directly
-  images: {
-    category: string;
-    filename: string;
-    id: string;
-    mime_type: string;
-    page: number;
-    url: string;
-  }[];
-  addresses: any[];
-}
-
-interface PropertyDetails {
-  property_id: string;
-  user_id: string;
-  // Backend returns separate lists
-  files: { mls_images: PropertyImage; comps_images: PropertyImage };
-  pdf_urls: string[];
-  created_at: string;
-  chat_history: any[];
-  images: any[];
-}
-
-interface Room {
-  id: string;
-  name: string;
-  type: string;
-  image_count: number;
-}
-
-interface Iteration {
-  id: string;
-  version: string;
-  label: string;
-  image_url: string;
-  created_at: string;
-  prompt?: string;
-}
-
-interface ChatRegenerateRequest {
-  property_id: string;
-  images: Record<string, string>;
-  user_feedback: string;
-}
-
-interface ChatRegenerateResponse {
-  regenerated_images: Array<{ url: string; mime_type: string }>;
-  description: string;
-  input_count: number;
-  message: string;
-}
 
 class ApiClient {
   private accessToken: string | null = null;
@@ -343,6 +253,17 @@ class ApiClient {
     });
   }
 
+  async deleteImage(
+    property_id: string,
+    image_id: string,
+    user_id: string,
+  ): Promise<any> {
+    return this.request(`/chat/delete/images`, {
+      method: "DELETE",
+      body: JSON.stringify({ property_id, image_id: [image_id], user_id }),
+    });
+  }
+
   async regenerateDesign(
     data: ChatRegenerateRequest,
   ): Promise<ChatRegenerateResponse> {
@@ -358,17 +279,3 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
-
-export type {
-  AuthTokens,
-  LoginRequest,
-  RegisterRequest,
-  User,
-  Project,
-  PropertyDetails,
-  Room,
-  PropertyImage,
-  Iteration,
-  ChatRegenerateRequest,
-  ChatRegenerateResponse,
-};

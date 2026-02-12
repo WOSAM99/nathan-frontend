@@ -26,15 +26,15 @@ type FormValues = {
 };
 
 export default function AuthPage() {
-const { showSnackbar } = useAppSnackbar();
-
+  const { showSnackbar } = useAppSnackbar();
 
   const { login, register: registerUser } = useAuth();
 
-  const [loading, setLoading] = useState(false);
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState<boolean>(false);
 
   const formValidation = useMemo(() => {
     return Yup.object().shape({
@@ -89,7 +89,7 @@ const { showSnackbar } = useAppSnackbar();
   } = methods;
 
   const onSubmit = async (data: FormValues) => {
-    if (isRegisterMode && data.password !== data.confirmPassword) {
+    if (isRegisterMode && data?.password !== data?.confirmPassword) {
       showSnackbar("Passwords do not match", "error");
       return;
     }
@@ -99,16 +99,16 @@ const { showSnackbar } = useAppSnackbar();
     try {
       if (isRegisterMode) {
         await registerUser({
-          email: data.email,
-          password: data.password,
-          full_name: data.fullName ?? "",
+          email: data?.email,
+          password: data?.password,
+          full_name: data?.fullName ?? "",
         });
 
         showSnackbar("Account created! Logging you in...", "success");
       } else {
         await login({
-          email: data.email,
-          password: data.password,
+          email: data?.email,
+          password: data?.password,
         });
 
         showSnackbar("Welcome back!", "success");
@@ -280,7 +280,7 @@ const { showSnackbar } = useAppSnackbar();
             gap: 0.5,
           }}
         >
-          <Typography sx={{ fontSize: 14 }} color="text.secondary">
+          <Typography sx={{ fontSize: 14 }} color="inherit">
             {isRegisterMode
               ? "Already have an account?"
               : "Don't have an account?"}{" "}

@@ -16,19 +16,20 @@ import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation } from "wouter";
-import { api, Project } from "@/lib/api";
+import { api } from "@/lib/api";
 import AppNavbar from "@/components/AppNavBar";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useAuth } from "@/contexts/AuthContext";
+import { Project } from "@/types";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const { userId } = useAuth();
 
   const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<number>(0);
 
   useEffect(() => {
     loadProjects();
@@ -99,7 +100,7 @@ export default function DashboardPage() {
         </Box>
 
         {/* SEARCH + FILTER */}
-        {/* <Box display="flex" alignItems="center" gap={1.5}>
+        <Box display="flex" alignItems="center" gap={1.5}>
           <TextField
             placeholder="Search addresses..."
             size="small"
@@ -144,7 +145,7 @@ export default function DashboardPage() {
           >
             <FilterListIcon sx={{ color: "#555", fontSize: 18 }} />
           </IconButton>
-        </Box> */}
+        </Box>
       </Box>
 
       {/* ===== PROJECT GRID ===== */}
@@ -159,8 +160,8 @@ export default function DashboardPage() {
             alignItems: "stretch",
           }}
         >
-          {projects?.map((project, idx) => (
-            <Grid key={project.property_id} size={{ xs: 12, sm: 6, md: 3 }}>
+          {projects?.map((project) => (
+            <Grid key={project?.property_id} size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 sx={{
                   borderRadius: 3,
@@ -197,83 +198,8 @@ export default function DashboardPage() {
                     }}
                   >
                     <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
-                      {project.property_id}
+                      {project?.property_id}
                     </Typography>
-
-                    <Box textAlign="right">
-                      {project.status === "IN_PROGRESS" &&
-                        project.days_left && (
-                          <>
-                            <Typography
-                              sx={{
-                                fontSize: 10,
-                                color: "#888",
-                                letterSpacing: 1,
-                              }}
-                            >
-                              TIMELINE
-                            </Typography>
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                letterSpacing: 1,
-                              }}
-                            >
-                              {project.days_left} Days Left
-                            </Typography>
-                          </>
-                        )}
-
-                      {project.status === "COMPLETED" &&
-                        project.roi_percent && (
-                          <>
-                            <Typography
-                              sx={{
-                                fontSize: 10,
-                                color: "#888",
-                                letterSpacing: 1,
-                              }}
-                            >
-                              ROI
-                            </Typography>
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                letterSpacing: 1,
-                                color: "#22c55e",
-                              }}
-                            >
-                              +{project.roi_percent}%
-                            </Typography>
-                          </>
-                        )}
-
-                      {project.status === "PLANNING" &&
-                        project.drafts_ready && (
-                          <>
-                            <Typography
-                              sx={{
-                                fontSize: 10,
-                                color: "#888",
-                                letterSpacing: 1,
-                              }}
-                            >
-                              DRAFTS
-                            </Typography>
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                letterSpacing: 1,
-                              }}
-                            >
-                              {project.drafts_ready} Ready
-                            </Typography>
-                          </>
-                        )}
-                    </Box>
                   </Box>
 
                   {/* ===== BUTTON  ===== */}
@@ -288,7 +214,7 @@ export default function DashboardPage() {
                       fontWeight: 600,
                     }}
                     onClick={() =>
-                      setLocation(`/organize/${project.property_id}`)
+                      setLocation(`/organize/${project?.property_id}`)
                     }
                   >
                     OPEN WORKSPACE

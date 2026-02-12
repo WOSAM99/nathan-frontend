@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -25,6 +25,7 @@ import { api } from "@/lib/api";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import AppNavbar from "@/components/AppNavBar";
 import { useAuth } from "@/contexts/AuthContext";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 /* ===== DESIGN TOKENS ===== */
 const ui = {
@@ -60,14 +61,55 @@ export default function PhotoSelectionPage() {
   const [loading, setLoading] = useState(true);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
+  const [deletePhoto, setDeletePhoto] = useState<Photo | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (!propertyId || !userId) {
-      setLoading(false);
-      return;
-    }
-    loadPropertyImages();
-  }, [propertyId, userId]);
+  const isSingleImageCategory = useMemo(
+    () => deletePhoto && getCategoryImageCount(deletePhoto?.roomCategory) === 1,
+    [],
+  );
+
+  const deleteDescription = useMemo(
+    () =>
+      isSingleImageCategory
+        ? "Deleting this image will also delete the category. Are you sure you want to delete both? This action cannot be reversed."
+        : "Are you sure you want to delete this image? This action cannot be reversed.",
+    [],
+  );
+
+  const categoryData = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          photos.map((p) => [
+            (p.roomCategory || "Unknown").toLowerCase(),
+            p.roomCategory || "Unknown",
+          ]),
+        ).values(),
+      ),
+    [],
+  );
+
+  const getCategoryImageCount = useCallback((category: string) => {
+    return photos.filter((p) => p.roomCategory === category).length;
+  }, []);
+
+  const dynamicCategories = useMemo(
+    () =>
+      categoryData
+        .map((cat) => ({
+          id: cat.toLowerCase().replace(/\s+/g, "_"),
+          label: cat,
+          count: photos.filter((p) => p.roomCategory === cat).length,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [],
+  );
+
+  const filteredPhotos = useMemo(
+    () => photos?.filter((p) => p.roomCategory === selectedCategory),
+    [],
+  );
 
   const loadPropertyImages = useCallback(async () => {
     if (!propertyId || !userId) return;
@@ -111,35 +153,13 @@ export default function PhotoSelectionPage() {
     }
   }, [propertyId, userId, showSnackbar]);
 
-  const categoryData = Array.from(
-    new Map(
-      photos.map((p) => [
-        (p.roomCategory || "Unknown").toLowerCase(),
-        p.roomCategory || "Unknown",
-      ]),
-    ).values(),
-  );
-
-  const dynamicCategories = categoryData
-    .map((cat) => ({
-      id: cat.toLowerCase().replace(/\s+/g, "_"),
-      label: cat,
-      count: photos.filter((p) => p.roomCategory === cat).length,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-
-  // --------- FILTER PHOTOS ----------
-  const filteredPhotos = photos?.filter(
-    (p) => p.roomCategory === selectedCategory,
-  );
-
-  const toggleSelection = (id: string) => {
+  const toggleSelection = useCallback((id: string) => {
     setPhotos((prev) =>
       prev.map((p) => (p.id === id ? { ...p, selected: !p.selected } : p)),
     );
-  };
+  }, []);
 
-  const moveSinglePhoto = async (id: string, newRoom: string) => {
+  const moveSinglePhoto = useCallback(async (id: string, newRoom: string) => {
     setPhotos((prev) =>
       prev.map((p) => (p.id === id ? { ...p, roomCategory: newRoom } : p)),
     );
@@ -151,11 +171,60 @@ export default function PhotoSelectionPage() {
       showSnackbar("Failed to move image", "error");
       loadPropertyImages();
     }
-  };
+  }, []);
 
-  const handleContinue = () => {
+  const handleContinue = useCallback(() => {
     setLocation(`/studio/${propertyId}`);
-  };
+  }, []);
+
+  const deletePhotoFn = useCallback(async () => {
+    if (!deletePhoto) return;
+
+    const deletedCategory = deletePhoto?.roomCategory;
+
+    try {
+      setDeleteLoading(true);
+
+      const updatedPhotos = photos.filter((p) => p.id !== deletePhoto.id);
+      setPhotos(updatedPhotos);
+
+      await api.deleteImage(propertyId, deletePhoto.id, String(userId));
+
+      showSnackbar("Image deleted successfully", "success");
+
+      const remainingInCategory = updatedPhotos.filter(
+        (p) => p.roomCategory === deletedCategory,
+      );
+
+      if (remainingInCategory.length === 0) {
+        const unknownCategory = updatedPhotos?.find(
+          (p) => p.roomCategory.toLowerCase() === "unknown",
+        )?.roomCategory;
+
+        if (unknownCategory) {
+          setSelectedCategory(unknownCategory);
+        } else if (updatedPhotos?.length > 0) {
+          setSelectedCategory(updatedPhotos[0]?.roomCategory);
+        } else {
+          setSelectedCategory("");
+        }
+      }
+    } catch (err) {
+      showSnackbar("Failed to delete image", "error");
+      loadPropertyImages();
+    } finally {
+      setDeleteLoading(false);
+      setDeletePhoto(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!propertyId || !userId) {
+      setLoading(false);
+      return;
+    }
+    loadPropertyImages();
+  }, [propertyId, userId]);
 
   if (loading) {
     return (
@@ -226,7 +295,7 @@ export default function PhotoSelectionPage() {
             {dynamicCategories?.map((cat) => {
               return (
                 <Box
-                  key={cat.id}
+                  key={cat?.id}
                   sx={{
                     display: "flex",
                     alignItems: "center",
@@ -236,14 +305,14 @@ export default function PhotoSelectionPage() {
                     borderRadius: 1,
                     cursor: "pointer",
                     bgcolor:
-                      selectedCategory === cat.label
+                      selectedCategory === cat?.label
                         ? "#0B1320"
                         : "transparent",
-                    color: selectedCategory === cat.label ? "white" : ui.text,
+                    color: selectedCategory === cat?.label ? "white" : ui.text,
 
                     "&:hover": {
                       bgcolor:
-                        selectedCategory === cat.label ? "#0B1320" : "#f3f3f3",
+                        selectedCategory === cat?.label ? "#0B1320" : "#f3f3f3",
                     },
 
                     "&:hover .action-icons": {
@@ -254,7 +323,7 @@ export default function PhotoSelectionPage() {
                 >
                   {/* LEFT: Category name + count */}
                   <Box
-                    onClick={() => setSelectedCategory(cat.label)}
+                    onClick={() => setSelectedCategory(cat?.label)}
                     sx={{ flex: 1 }}
                   >
                     <Typography
@@ -266,22 +335,21 @@ export default function PhotoSelectionPage() {
                         wordBreak: "break-word",
                       }}
                     >
-                      {cat.label}{" "}
+                      {cat?.label}{" "}
                       <Typography
                         component="span"
                         sx={{
                           fontSize: 14,
                           color:
-                            selectedCategory === cat.label ? "#fff" : ui.muted,
+                            selectedCategory === cat?.label ? "#fff" : ui.muted,
                           whiteSpace: "nowrap",
                           display: "inline",
                         }}
                       >
-                        ({cat.count})
+                        ({cat?.count})
                       </Typography>
                     </Typography>
                   </Box>
-                  {/* RIGHT: Edit & Delete icons — hidden by default */}
                   <Box
                     className="action-icons"
                     display="flex"
@@ -289,7 +357,7 @@ export default function PhotoSelectionPage() {
                     gap={0.5}
                     sx={{
                       opacity: 0,
-                      pointerEvents: "none", // prevents clicking when hidden
+                      pointerEvents: "none",
                       transition: "opacity 0.2s ease",
                     }}
                   >
@@ -297,12 +365,12 @@ export default function PhotoSelectionPage() {
                       size="small"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const newName = prompt("Rename category:", cat.label);
+                        const newName = prompt("Rename category:", cat?.label);
                         // if (newName) renameCategory(cat.label, newName);
                       }}
                       sx={{
                         color:
-                          selectedCategory === cat.label ? "white" : ui.muted,
+                          selectedCategory === cat?.label ? "white" : ui.muted,
                       }}
                     >
                       <EditOutlined fontSize="small" />
@@ -316,7 +384,7 @@ export default function PhotoSelectionPage() {
                       }}
                       sx={{
                         color:
-                          selectedCategory === cat.label ? "white" : ui.muted,
+                          selectedCategory === cat?.label ? "white" : ui.muted,
                       }}
                     >
                       <DeleteOutline fontSize="small" />
@@ -350,9 +418,9 @@ export default function PhotoSelectionPage() {
               <Typography
                 sx={{ fontSize: 13, color: ui.muted, letterSpacing: 1 }}
               >
-                {photos.length} items total •{" "}
+                {photos?.length} items total •{" "}
                 {
-                  photos.filter(
+                  photos?.filter(
                     (p) => p.roomCategory.toLowerCase() !== "unknown",
                   ).length
                 }{" "}
@@ -362,9 +430,9 @@ export default function PhotoSelectionPage() {
 
             <Grid container spacing={3}>
               {filteredPhotos?.map((photo) => (
-                <Grid key={photo.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                <Grid key={photo?.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                   <Card
-                    onClick={() => toggleSelection(photo.id)}
+                    onClick={() => toggleSelection(photo?.id)}
                     sx={{
                       position: "relative",
                       cursor: "pointer",
@@ -375,7 +443,7 @@ export default function PhotoSelectionPage() {
                   >
                     <CardMedia
                       component="img"
-                      image={photo.src}
+                      image={photo?.src}
                       sx={{
                         width: "100%",
                         height: 180,
@@ -413,7 +481,7 @@ export default function PhotoSelectionPage() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // deletePhoto(photo.id);
+                          setDeletePhoto(photo);
                         }}
                       >
                         <DeleteOutline sx={{ color: ui.text, fontSize: 18 }} />
@@ -439,7 +507,7 @@ export default function PhotoSelectionPage() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActivePhoto(photo.id);
+                          setActivePhoto(photo?.id);
                           setMenuAnchor(e.currentTarget);
                         }}
                       >
@@ -463,15 +531,15 @@ export default function PhotoSelectionPage() {
             ?.filter((c) => c.label !== selectedCategory)
             ?.map((cat) => (
               <MenuItem
-                key={cat.id}
+                key={cat?.id}
                 onClick={() => {
                   if (activePhoto) {
-                    moveSinglePhoto(activePhoto, cat.label);
+                    moveSinglePhoto(activePhoto, cat?.label);
                   }
                   setMenuAnchor(null);
                 }}
               >
-                {cat.label}
+                {cat?.label}
               </MenuItem>
             ))}
         </Menu>
@@ -507,6 +575,17 @@ export default function PhotoSelectionPage() {
           </Button>
         </Box>
       </Box>
+
+      <ConfirmDialog
+        open={Boolean(deletePhoto)}
+        title="Delete Image"
+        description={deleteDescription}
+        onConfirm={deletePhotoFn}
+        onCancel={() => setDeletePhoto(null)}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        loading={deleteLoading}
+      />
     </>
   );
 }

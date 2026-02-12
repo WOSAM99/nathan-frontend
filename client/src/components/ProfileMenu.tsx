@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Box,
   Avatar,
@@ -18,21 +18,22 @@ export default function ProfileMenu() {
   const [, setLocation] = useLocation();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const open = useMemo(() => Boolean(anchorEl), []);
+
+  const handleMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-  };
+  }, []);
 
-  const handleMenuClose = () => {
+  const handleMenuClose = useCallback(() => {
     setAnchorEl(null);
-  };
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     handleMenuClose();
     await api.logout();
     setLocation("/");
-  };
+  }, []);
 
   return (
     <Box>
@@ -115,7 +116,9 @@ export default function ProfileMenu() {
           }}
         >
           <PersonOutlineOutlinedIcon fontSize="small" />
-          <Typography  sx={{letterSpacing: 1,fontSize: 14}}>Profile</Typography>
+          <Typography sx={{ letterSpacing: 1, fontSize: 14 }}>
+            Profile
+          </Typography>
         </MenuItem>
 
         {/* Settings Item */}
@@ -128,7 +131,9 @@ export default function ProfileMenu() {
           }}
         >
           <SettingsOutlinedIcon fontSize="small" />
-          <Typography sx={{letterSpacing: 1,fontSize: 14}}>Settings</Typography>
+          <Typography sx={{ letterSpacing: 1, fontSize: 14 }}>
+            Settings
+          </Typography>
         </MenuItem>
 
         <Divider />
@@ -147,7 +152,9 @@ export default function ProfileMenu() {
           }}
         >
           <LogoutOutlinedIcon fontSize="small" />
-          <Typography sx={{letterSpacing: 1,fontSize: 14}}>Log out</Typography>
+          <Typography sx={{ letterSpacing: 1, fontSize: 14 }}>
+            Log out
+          </Typography>
         </MenuItem>
       </Menu>
     </Box>
