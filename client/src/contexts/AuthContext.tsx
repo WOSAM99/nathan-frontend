@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { LoginRequest, RegisterRequest } from "@/types";
+import { AuthContextType, LoginRequest, RegisterRequest } from "@/types";
 import {
   createContext,
   useContext,
@@ -9,16 +9,6 @@ import {
   useCallback,
 } from "react";
 import { useLocation } from "wouter";
-
-interface AuthContextType {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  userId: string | null;
-  setUserId: (id: string | null) => void;
-  login: (data: LoginRequest) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => Promise<void>;
-}
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -39,20 +29,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (data: LoginRequest) => {
-    const res = await api.login(data);
-    setUserId(res.user_id);
-    localStorage.setItem("user_id", res.user_id);
+  const login = useCallback(
+    async (data: LoginRequest) => {
+      const res = await api.login(data);
+      setUserId(res.user_id);
+      localStorage.setItem("user_id", res.user_id);
 
-    setIsAuthenticated(true);
-    setLocation("/dashboard");
-  }, []);
+      setIsAuthenticated(true);
+      setLocation("/dashboard");
+    },
+    [setLocation],
+  );
 
-  const register = useCallback(async (data: RegisterRequest) => {
-    await api.register(data);
-    setIsAuthenticated(true);
-    setLocation("/dashboard");
-  }, []);
+  const register = useCallback(
+    async (data: RegisterRequest) => {
+      await api.register(data);
+      setIsAuthenticated(true);
+      setLocation("/dashboard");
+    },
+    [setLocation],
+  );
 
   const logout = useCallback(async () => {
     await api.logout();
@@ -60,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserId(null);
     localStorage.removeItem("user_id");
     setLocation("/");
-  }, []);
+  }, [setLocation]);
 
   return (
     <AuthContext.Provider

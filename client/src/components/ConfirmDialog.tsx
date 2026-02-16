@@ -1,3 +1,4 @@
+import { ConfirmDialogProps } from "@/types";
 import {
   Dialog,
   DialogTitle,
@@ -6,17 +7,6 @@ import {
   Typography,
   Button,
 } from "@mui/material";
-
-interface ConfirmDialogProps {
-  open: boolean;
-  title?: string;
-  description?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  confirmText?: string;
-  cancelText?: string;
-  loading?: boolean;
-}
 
 export default function ConfirmDialog({
   open,
@@ -47,7 +37,12 @@ export default function ConfirmDialog({
         >
           {confirmText}
         </Button>
-        <Button onClick={onCancel} variant="outlined" disabled={loading} color={"inherit"}>
+        <Button
+          onClick={onCancel}
+          variant="outlined"
+          disabled={loading}
+          color={"inherit"}
+        >
           {cancelText}
         </Button>
       </DialogActions>

@@ -31,10 +31,6 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState<number>(0);
 
-  useEffect(() => {
-    loadProjects();
-  }, [userId]);
-
   const loadProjects = useCallback(async () => {
     try {
       if (userId) {
@@ -48,6 +44,10 @@ export default function DashboardPage() {
     }
   }, [userId]);
 
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects, userId]);
+    
   return (
     <Box>
       <AppNavbar

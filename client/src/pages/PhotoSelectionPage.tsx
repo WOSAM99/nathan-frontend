@@ -26,6 +26,7 @@ import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import AppNavbar from "@/components/AppNavBar";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Photo } from "@/types";
 
 /* ===== DESIGN TOKENS ===== */
 const ui = {
@@ -40,19 +41,9 @@ const ui = {
   cardRadius: 4,
 };
 
-interface Photo {
-  id: string;
-  src: string;
-  rawCategory: string;
-  roomCategory: string;
-  selected: boolean;
-  filename: string;
-}
-
 export default function PhotoSelectionPage() {
   const { showSnackbar } = useAppSnackbar();
   const params = useParams();
-  const propertyId = params.id || "";
   const { userId } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -64,18 +55,7 @@ export default function PhotoSelectionPage() {
   const [deletePhoto, setDeletePhoto] = useState<Photo | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
 
-  const isSingleImageCategory = useMemo(
-    () => deletePhoto && getCategoryImageCount(deletePhoto?.roomCategory) === 1,
-    [],
-  );
-
-  const deleteDescription = useMemo(
-    () =>
-      isSingleImageCategory
-        ? "Deleting this image will also delete the category. Are you sure you want to delete both? This action cannot be reversed."
-        : "Are you sure you want to delete this image? This action cannot be reversed.",
-    [],
-  );
+  const propertyId = useMemo(() => params.id || "", [params.id]);
 
   const categoryData = useMemo(
     () =>
@@ -87,12 +67,28 @@ export default function PhotoSelectionPage() {
           ]),
         ).values(),
       ),
-    [],
+    [photos],
   );
 
-  const getCategoryImageCount = useCallback((category: string) => {
-    return photos.filter((p) => p.roomCategory === category).length;
-  }, []);
+  const getCategoryImageCount = useCallback(
+    (category: string) => {
+      return photos?.filter((p) => p.roomCategory === category)?.length;
+    },
+    [photos],
+  );
+
+  const isSingleImageCategory = useMemo(
+    () => deletePhoto && getCategoryImageCount(deletePhoto?.roomCategory) === 1,
+    [deletePhoto, getCategoryImageCount],
+  );
+
+  const deleteDescription = useMemo(
+    () =>
+      isSingleImageCategory
+        ? "Deleting this image will also delete the category. Are you sure you want to delete both? This action cannot be reversed."
+        : "Are you sure you want to delete this image? This action cannot be reversed.",
+    [isSingleImageCategory],
+  );
 
   const dynamicCategories = useMemo(
     () =>
@@ -103,12 +99,12 @@ export default function PhotoSelectionPage() {
           count: photos.filter((p) => p.roomCategory === cat).length,
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [],
+    [categoryData, photos],
   );
 
   const filteredPhotos = useMemo(
     () => photos?.filter((p) => p.roomCategory === selectedCategory),
-    [],
+    [photos, selectedCategory],
   );
 
   const loadPropertyImages = useCallback(async () => {
@@ -159,23 +155,26 @@ export default function PhotoSelectionPage() {
     );
   }, []);
 
-  const moveSinglePhoto = useCallback(async (id: string, newRoom: string) => {
-    setPhotos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, roomCategory: newRoom } : p)),
-    );
+  const moveSinglePhoto = useCallback(
+    async (id: string, newRoom: string) => {
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, roomCategory: newRoom } : p)),
+      );
 
-    try {
-      await api.updateImageCategory(propertyId, id, newRoom, String(userId));
-      showSnackbar("Image moved", "success");
-    } catch {
-      showSnackbar("Failed to move image", "error");
-      loadPropertyImages();
-    }
-  }, []);
+      try {
+        await api.updateImageCategory(propertyId, id, newRoom, String(userId));
+        showSnackbar("Image moved", "success");
+      } catch {
+        showSnackbar("Failed to move image", "error");
+        loadPropertyImages();
+      }
+    },
+    [loadPropertyImages, propertyId, showSnackbar, userId],
+  );
 
   const handleContinue = useCallback(() => {
     setLocation(`/studio/${propertyId}`);
-  }, []);
+  }, [propertyId, setLocation]);
 
   const deletePhotoFn = useCallback(async () => {
     if (!deletePhoto) return;
@@ -216,7 +215,14 @@ export default function PhotoSelectionPage() {
       setDeleteLoading(false);
       setDeletePhoto(null);
     }
-  }, []);
+  }, [
+    deletePhoto,
+    loadPropertyImages,
+    photos,
+    propertyId,
+    showSnackbar,
+    userId,
+  ]);
 
   useEffect(() => {
     if (!propertyId || !userId) {
@@ -224,6 +230,7 @@ export default function PhotoSelectionPage() {
       return;
     }
     loadPropertyImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId, userId]);
 
   if (loading) {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -17,13 +17,7 @@ import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import { IconButton, InputAdornment } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-
-type FormValues = {
-  fullName?: string;
-  email: string;
-  password: string;
-  confirmPassword?: string;
-};
+import { FormValues } from "@/types";
 
 export default function AuthPage() {
   const { showSnackbar } = useAppSnackbar();
@@ -88,41 +82,44 @@ export default function AuthPage() {
     formState: { errors },
   } = methods;
 
-  const onSubmit = async (data: FormValues) => {
-    if (isRegisterMode && data?.password !== data?.confirmPassword) {
-      showSnackbar("Passwords do not match", "error");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (isRegisterMode) {
-        await registerUser({
-          email: data?.email,
-          password: data?.password,
-          full_name: data?.fullName ?? "",
-        });
-
-        showSnackbar("Account created! Logging you in...", "success");
-      } else {
-        await login({
-          email: data?.email,
-          password: data?.password,
-        });
-
-        showSnackbar("Welcome back!", "success");
+  const onSubmit = useCallback(
+    async (data: FormValues) => {
+      if (isRegisterMode && data?.password !== data?.confirmPassword) {
+        showSnackbar("Passwords do not match", "error");
+        return;
       }
-    } catch (error: any) {
-      showSnackbar(
-        error?.message ||
-          (isRegisterMode ? "Registration failed" : "Login failed"),
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      setLoading(true);
+
+      try {
+        if (isRegisterMode) {
+          await registerUser({
+            email: data?.email,
+            password: data?.password,
+            full_name: data?.fullName ?? "",
+          });
+
+          showSnackbar("Account created! Logging you in...", "success");
+        } else {
+          await login({
+            email: data?.email,
+            password: data?.password,
+          });
+
+          showSnackbar("Welcome back!", "success");
+        }
+      } catch (error: any) {
+        showSnackbar(
+          error?.message ||
+            (isRegisterMode ? "Registration failed" : "Login failed"),
+          "error",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isRegisterMode, login, registerUser, showSnackbar],
+  );
 
   return (
     <Box

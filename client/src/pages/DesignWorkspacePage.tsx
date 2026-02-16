@@ -46,7 +46,6 @@ export default function DesignWorkspacePage() {
   const { showSnackbar } = useAppSnackbar();
   const { userId } = useAuth();
   const [, params] = useRoute("/studio/:id");
-  const propertyId = params?.id || "";
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -72,9 +71,11 @@ export default function DesignWorkspacePage() {
   const [versionCounter, setVersionCounter] = useState<number>(1.1);
   const [selectedAddress, setSelectedAddress] = useState<string>("");
 
+  const propertyId = useMemo(() => params?.id || "", [params?.id]);
+
   const selectedImages = useMemo(
     () => compsImages?.addresses?.[selectedAddress]?.images || [],
-    [],
+    [compsImages?.addresses, selectedAddress],
   );
 
   const toggleBaselineSelect = useCallback((id: string) => {
@@ -103,15 +104,25 @@ export default function DesignWorkspacePage() {
     chatEndRef?.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  const handleNext = useCallback((e: any) => {
-    e.stopPropagation();
-    setCurrentIndex((prev) => (prev < spaceImages?.length - 1 ? prev + 1 : 0));
-  }, []);
+  const handleNext = useCallback(
+    (e: any) => {
+      e.stopPropagation();
+      setCurrentIndex((prev) =>
+        prev < spaceImages?.length - 1 ? prev + 1 : 0,
+      );
+    },
+    [spaceImages?.length],
+  );
 
-  const handlePrev = useCallback((e: any) => {
-    e.stopPropagation();
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : spaceImages?.length - 1));
-  }, []);
+  const handlePrev = useCallback(
+    (e: any) => {
+      e.stopPropagation();
+      setCurrentIndex((prev) =>
+        prev > 0 ? prev - 1 : spaceImages?.length - 1,
+      );
+    },
+    [spaceImages?.length],
+  );
 
   const handleExecute = useCallback(async () => {
     if (selectedBaselineIds?.length === 0 && selectedCompsIds?.length === 0) {
@@ -208,11 +219,16 @@ export default function DesignWorkspacePage() {
       showSnackbar("Failed to regenerate design", "error");
     }
   }, [
-    userId,
-    propertyId,
-    selectedAddress,
     selectedBaselineIds,
     selectedCompsIds,
+    inputText,
+    propertyId,
+    userId,
+    showSnackbar,
+    spaceImages,
+    activeSpace,
+    selectedImages,
+    selectedAddress,
     versionCounter,
   ]);
 
@@ -284,11 +300,11 @@ export default function DesignWorkspacePage() {
     } catch (err) {
       showSnackbar("Failed to load property details", "error");
     }
-  }, [userId, propertyId]);
+  }, [propertyId, userId, showSnackbar]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   useEffect(() => {
     setCurrentIndex(0);
@@ -300,6 +316,7 @@ export default function DesignWorkspacePage() {
     }
 
     loadDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, propertyId]);
 
   useEffect(() => {

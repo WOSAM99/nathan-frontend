@@ -19,7 +19,7 @@ export default function ProfileMenu() {
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const open = useMemo(() => Boolean(anchorEl), []);
+  const open = useMemo(() => Boolean(anchorEl), [anchorEl]);
 
   const handleMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -33,7 +33,7 @@ export default function ProfileMenu() {
     handleMenuClose();
     await api.logout();
     setLocation("/");
-  }, []);
+  }, [handleMenuClose, setLocation]);
 
   return (
     <Box>

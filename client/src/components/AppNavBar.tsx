@@ -3,16 +3,7 @@ import { useLocation } from "wouter";
 import ProfileMenu from "@/components/ProfileMenu";
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 import { useCallback } from "react";
-
-interface AppNavbarProps {
-  centerContent?: React.ReactNode;
-  showNewProject?: boolean;
-  showBack?: boolean;
-  onBack?: () => void;
-  propertyId?: string;
-  bgcolor?: string;
-  exportPackage?: boolean;
-}
+import { AppNavbarProps } from "@/types";
 
 export default function AppNavbar({
   centerContent,
@@ -31,7 +22,7 @@ export default function AppNavbar({
     } else {
       window.history.back();
     }
-  }, []);
+  }, [onBack]);
 
   return (
     <Box

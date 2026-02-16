@@ -11,83 +11,84 @@ import AppNavbar from "@/components/AppNavBar";
 export default function ProjectSetupPage() {
   const { showSnackbar } = useAppSnackbar();
   const [, setLocation] = useLocation();
+ const mlsInputRef = useRef<HTMLInputElement>(null);
+ const compInputRef = useRef<HTMLInputElement>(null);
 
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [mlsFiles, setMlsFiles] = useState<File[]>([]);
-  const [compFiles, setCompFiles] = useState<File[]>([]);
+ const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+ const [mlsFiles, setMlsFiles] = useState<File[]>([]);
+ const [compFiles, setCompFiles] = useState<File[]>([]);
 
-  const mlsInputRef = useRef<HTMLInputElement>(null);
-  const compInputRef = useRef<HTMLInputElement>(null);
+ const handleMlsUpload = useCallback(
+   (e: React.ChangeEvent<HTMLInputElement>) => {
+     const files = e.target.files;
+     if (!files) return;
 
-  const handleMlsUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files) return;
+     setMlsFiles((prev) => [...prev, ...Array.from(files)]);
+   },
+   [],
+ );
 
-      setMlsFiles((prev) => [...prev, ...Array.from(files)]);
-    },
-    [],
-  );
+ const handleCompUpload = useCallback(
+   (e: React.ChangeEvent<HTMLInputElement>) => {
+     const files = e.target.files;
+     if (!files) return;
 
-  const handleCompUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files) return;
+     setCompFiles((prev) => [...prev, ...Array.from(files)]);
+   },
+   [],
+ );
 
-      setCompFiles((prev) => [...prev, ...Array.from(files)]);
-    },
-    [],
-  );
+ const removeMlsFile = useCallback(
+   (index: number) => setMlsFiles((prev) => prev.filter((_, i) => i !== index)),
+   [],
+ );
 
-  const removeMlsFile = useCallback(
-    (index: number) =>
-      setMlsFiles((prev) => prev.filter((_, i) => i !== index)),
-    [],
-  );
+ const removeCompFile = useCallback(
+   (index: number) =>
+     setCompFiles((prev) => prev.filter((_, i) => i !== index)),
+   [],
+ );
 
-  const removeCompFile = useCallback(
-    (index: number) =>
-      setCompFiles((prev) => prev.filter((_, i) => i !== index)),
-    [],
-  );
+ const uploadSequence = useCallback(async () => {
+   let currentPropId = "new";
 
-  const uploadSequence = useCallback(async () => {
-    let currentPropId = "new";
+   if (mlsFiles.length > 0) {
+     const res = await api.uploadPDF(mlsFiles, currentPropId, "mls");
+     currentPropId = res.property_id;
+   }
 
-    if (mlsFiles.length > 0) {
-      const res = await api.uploadPDF(mlsFiles, currentPropId, "mls");
-      currentPropId = res.property_id;
-    }
+   if (compFiles.length > 0) {
+     const res = await api.uploadPDF(compFiles, currentPropId, "comps");
+     currentPropId = res.property_id;
+   }
 
-    if (compFiles.length > 0) {
-      const res = await api.uploadPDF(compFiles, currentPropId, "comps");
-      currentPropId = res.property_id;
-    }
+   return currentPropId;
+ }, [compFiles, mlsFiles]);
 
-    return currentPropId;
-  }, []);
+ const handleSubmit = useCallback(
+   async (e: React.FormEvent) => {
+     e.preventDefault();
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+     if (mlsFiles?.length === 0) {
+       showSnackbar("Please upload MLS Listing PDF", "error");
+       return;
+     }
 
-    if (mlsFiles.length === 0) {
-      showSnackbar("Please upload MLS Listing PDF", "error");
-      return;
-    }
+     setIsSubmitting(true);
 
-    setIsSubmitting(true);
+     try {
+       const finalPropertyId = await uploadSequence();
 
-    try {
-      const finalPropertyId = await uploadSequence();
-
-      showSnackbar("Project initialized successfully", "success");
-      setLocation(`/organize/${finalPropertyId}`);
-    } catch (error: any) {
-      showSnackbar(error?.message || "Upload failed", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, []);
+       showSnackbar("Project initialized successfully", "success");
+       setLocation(`/organize/${finalPropertyId}`);
+     } catch (error: any) {
+       showSnackbar(error?.message || "Upload failed", "error");
+     } finally {
+       setIsSubmitting(false);
+     }
+   },
+   [mlsFiles?.length, setLocation, showSnackbar, uploadSequence],
+ );
 
   return (
     <Box

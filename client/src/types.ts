@@ -97,3 +97,50 @@ export interface ChatRegenerateResponse {
   input_count: number;
   message: string;
 }
+
+export interface AppNavbarProps {
+  centerContent?: React.ReactNode;
+  showNewProject?: boolean;
+  showBack?: boolean;
+  onBack?: () => void;
+  propertyId?: string;
+  bgcolor?: string;
+  exportPackage?: boolean;
+}
+
+export interface ConfirmDialogProps {
+  open: boolean;
+  title?: string;
+  description?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  loading?: boolean;
+}
+
+export interface AuthContextType {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  userId: string | null;
+  setUserId: (id: string | null) => void;
+  login: (data: LoginRequest) => Promise<void>;
+  register: (data: RegisterRequest) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+export type FormValues = {
+  fullName?: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
+};
+
+export interface Photo {
+  id: string;
+  src: string;
+  rawCategory: string;
+  roomCategory: string;
+  selected: boolean;
+  filename: string;
+}
