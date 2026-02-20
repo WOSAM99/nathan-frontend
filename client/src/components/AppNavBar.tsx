@@ -12,7 +12,6 @@ export default function AppNavbar({
   onBack,
   propertyId,
   bgcolor,
-  exportPackage,
 }: AppNavbarProps) {
   const [, setLocation] = useLocation();
 
@@ -105,25 +104,6 @@ export default function AppNavbar({
             }}
           >
             + NEW PROJECT
-          </Button>
-        )}
-        {exportPackage && (
-          <Button
-            variant="contained"
-            sx={{
-              bgcolor: "#000",
-              color: "white",
-              borderRadius: 999,
-              textTransform: "none",
-              px: 2.5,
-              fontSize: 12,
-              letterSpacing: 1,
-            }}
-            onClick={() => {
-              setLocation("/property-selection");
-            }}
-          >
-            EXPORT PACKAGE
           </Button>
         )}
         <ProfileMenu />

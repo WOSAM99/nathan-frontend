@@ -306,6 +306,60 @@ class ApiClient {
       }),
     });
   }
+
+  async getImageUrl(
+    property_id: string,
+    user_id: string,
+    image: string,
+  ): Promise<any> {
+    return this.request(`chat/image/url`, {
+      method: "DELETE",
+      body: JSON.stringify({
+        property_id,
+        user_id,
+        image,
+      }),
+    });
+  }
+
+  async storeIterationImages(body: {
+    property_id: string;
+    user_id: string;
+    images: string;
+  }): Promise<any> {
+    return this.request(`/chat/store/iteration`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async storeFinalImages(body: {
+    property_id: string;
+    user_id: string;
+    images: {
+      url: string;
+      description: string;
+      category: string;
+    }[];
+  }): Promise<any> {
+    return this.request(`/chat/store/finalproperty`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async addCategoryJson(body: {
+    property_id: string;
+    user_id: string;
+    category: string;
+    image?: string;
+  }): Promise<any> {
+    return this.request(`/doc/add/category`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
 }
+
 
 export const api = new ApiClient();

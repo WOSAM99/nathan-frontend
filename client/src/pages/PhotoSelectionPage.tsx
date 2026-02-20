@@ -12,6 +12,7 @@ import {
   Paper,
   Backdrop,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 
 import {
@@ -28,6 +29,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { DeleteTarget, Photo } from "@/types";
 import RenameCategoryDialog from "@/components/RenameCategoryDialog";
+import AddCategoryModal from "@/components/AddCategoryModal";
+import Add from "@mui/icons-material/Add";
 
 /* ===== DESIGN TOKENS ===== */
 const ui = {
@@ -59,6 +62,7 @@ export default function PhotoSelectionPage() {
   const [renameCategoryName, setRenameCategoryName] = useState<string>("");
   const [renameLoading, setRenameLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
 
   const propertyId = useMemo(() => params.id || "", [params.id]);
 
@@ -291,20 +295,33 @@ export default function PhotoSelectionPage() {
             height: "100%",
           }}
         >
-          <Typography
-            sx={{
-              fontSize: 14,
-              letterSpacing: 1,
-              color: "#000",
-              mb: 0.5,
-              pl: 1.5,
-              textTransform: "uppercase",
-              fontWeight: 600,
-            }}
+          <Box
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+            pr={2}
+            flexDirection={"row"}
           >
-            ROOM BUCKETS
-          </Typography>
+            <Typography
+              sx={{
+                fontSize: 14,
+                letterSpacing: 1,
+                color: "#000",
+                textTransform: "uppercase",
+                fontWeight: 600,
+              }}
+            >
+              CATEGORIES
+            </Typography>
 
+            <IconButton
+              size="small"
+              onClick={() => setAddCategoryOpen(true)}
+              sx={{ background: "white" }}
+            >
+              <Add fontSize="small" />
+            </IconButton>
+          </Box>
           <Box
             display="flex"
             flexDirection="column"
@@ -563,6 +580,24 @@ export default function PhotoSelectionPage() {
           open={Boolean(menuAnchor)}
           onClose={() => setMenuAnchor(null)}
         >
+          <Box
+            onClick={() => setAddCategoryOpen(true)}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: 1.5,
+              py: 1,
+              borderRadius: 1,
+              cursor: "pointer",
+
+              "&:hover": { bgcolor: "#f3f3f3" },
+            }}
+          >
+            <Add fontSize="small" />
+            <Typography fontSize={14}>Add New Category</Typography>
+          </Box>
+          <Divider />
           {dynamicCategories
             ?.filter((c) => c.label !== selectedCategory)
             ?.map((cat) => (
@@ -635,6 +670,14 @@ export default function PhotoSelectionPage() {
         loading={renameLoading}
         onCancel={() => setRenameDialogOpen(false)}
         onConfirm={(newName) => renameCategory(renameCategoryName, newName)}
+      />
+
+      <AddCategoryModal
+        open={addCategoryOpen}
+        onClose={() => setAddCategoryOpen(false)}
+        propertyId={propertyId}
+        userId={String(userId)}
+        onSuccess={loadPropertyImages}
       />
     </>
   );
