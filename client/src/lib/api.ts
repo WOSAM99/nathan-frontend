@@ -273,8 +273,38 @@ class ApiClient {
     });
   }
 
-  getImageUrl(imageId: string): string {
-    return `${API_BASE_URL}/doc/image/${imageId}`;
+  async renameCategory(
+    property_id: string,
+    old_category: string,
+    new_category: string,
+    user_id: string,
+  ): Promise<any> {
+    return this.request(`/chat/rename/category`, {
+      method: "POST",
+      body: JSON.stringify({
+        property_id,
+        old_category,
+        new_category,
+        user_id,
+      }),
+    });
+  }
+
+  async deleteCategory(
+    property_id: string,
+    user_id: string,
+    category: string,
+    isDeleteCategory: boolean,
+  ): Promise<any> {
+    return this.request(`/chat/delete/category`, {
+      method: "DELETE",
+      body: JSON.stringify({
+        property_id,
+        user_id,
+        category,
+        isDeleteCategory,
+      }),
+    });
   }
 }
 

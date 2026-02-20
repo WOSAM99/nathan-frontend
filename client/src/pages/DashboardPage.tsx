@@ -12,13 +12,10 @@ import {
   Tabs,
   Tab,
 } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
-import FilterListIcon from "@mui/icons-material/FilterList";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation } from "wouter";
 import { api } from "@/lib/api";
 import AppNavbar from "@/components/AppNavBar";
-import ClearIcon from "@mui/icons-material/Clear";
 import { useAuth } from "@/contexts/AuthContext";
 import { Project } from "@/types";
 
@@ -28,7 +25,6 @@ export default function DashboardPage() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState<number>(0);
 
   const loadProjects = useCallback(async () => {
@@ -47,7 +43,7 @@ export default function DashboardPage() {
   useEffect(() => {
     loadProjects();
   }, [loadProjects, userId]);
-    
+
   return (
     <Box>
       <AppNavbar
@@ -98,54 +94,6 @@ export default function DashboardPage() {
             Manage and monitor your active renovation investments.
           </Typography>
         </Box>
-
-        {/* SEARCH + FILTER */}
-        <Box display="flex" alignItems="center" gap={1.5}>
-          <TextField
-            placeholder="Search addresses..."
-            size="small"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              width: 320,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "999px",
-                backgroundColor: "#F3F5F7",
-                height: 40,
-              },
-              "& fieldset": {
-                border: "none",
-              },
-            }}
-            InputProps={{
-              startAdornment: (
-                <SearchIcon sx={{ mr: 1, color: "#888", fontSize: 18 }} />
-              ),
-
-              endAdornment: searchQuery ? (
-                <IconButton
-                  size="small"
-                  onClick={() => setSearchQuery("")}
-                  sx={{ mr: 0.5 }}
-                >
-                  <ClearIcon sx={{ fontSize: 18, color: "#888" }} />
-                </IconButton>
-              ) : null,
-            }}
-          />
-
-          <IconButton
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              bgcolor: "#F3F5F7",
-              "&:hover": { bgcolor: "#eaeef2" },
-            }}
-          >
-            <FilterListIcon sx={{ color: "#555", fontSize: 18 }} />
-          </IconButton>
-        </Box>
       </Box>
 
       {/* ===== PROJECT GRID ===== */}
@@ -176,7 +124,11 @@ export default function DashboardPage() {
                 {/* IMAGE */}
                 <CardMedia
                   component="img"
-                  image={project.thumbnail_url}
+                  src={
+                    Object.values(
+                      project?.files?.mls?.categories || {},
+                    ).flatMap((cat: any) => cat?.images || [])?.[0]?.url
+                  }
                   sx={{
                     objectFit: "cover",
                   }}
@@ -198,7 +150,7 @@ export default function DashboardPage() {
                     }}
                   >
                     <Typography sx={{ fontSize: 14, letterSpacing: 1 }}>
-                      {project?.property_id}
+                      {project?.files?.mls?.address || project?.property_id}
                     </Typography>
                   </Box>
 

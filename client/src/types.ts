@@ -23,6 +23,12 @@ export interface User {
 }
 
 export interface Project {
+  files?: {
+    mls: {
+      address: string;
+      categories?: { unknown?: { images?: { url?: string }[] } };
+    };
+  };
   property_id: string;
   user_id?: string;
   created_at?: string;
@@ -55,6 +61,7 @@ export interface PropertyImage {
     page: number;
     url: string;
   }[];
+  categories?: any[];
   addresses: any[];
 }
 
@@ -144,3 +151,14 @@ export interface Photo {
   selected: boolean;
   filename: string;
 }
+
+export type DeleteTarget =
+  | { type: "image"; photo: Photo }
+  | { type: "category"; category: string }
+  | null;
+
+export type ChatMessage = {
+  sender: "user" | "ai";
+  text: string;
+  images?: { url: string }[];
+};

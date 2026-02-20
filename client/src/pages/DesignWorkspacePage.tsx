@@ -28,7 +28,8 @@ import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import CollectionsOutlined from "@mui/icons-material/CollectionsOutlined";
 import History from "@mui/icons-material/History";
 import AppNavbar from "@/components/AppNavBar";
-import { PropertyDetails } from "@/types";
+import { ChatMessage, PropertyDetails } from "@/types";
+import CloseIcon from "@mui/icons-material/Close";
 
 /* ================= DESIGN TOKENS ================= */
 const ui = {
@@ -40,6 +41,22 @@ const ui = {
   primary: "#0B1320",
   blue: "#2563EB",
   cardRadius: 4,
+};
+
+const toTitleCase = (str: string) =>
+  str
+    .toLowerCase()
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+const getRoomName = (categoryName: string) => {
+  const room =
+    categoryName && categoryName.includes("-")
+      ? categoryName.split("-").slice(1).join("-").trim()
+      : categoryName || "Unknown";
+
+  return toTitleCase(room);
 };
 
 export default function DesignWorkspacePage() {
@@ -54,9 +71,7 @@ export default function DesignWorkspacePage() {
   const [activeSpace, setActiveSpace] = useState<string>("Kitchen");
   const [spaces, setSpaces] = useState<string[]>([]);
   const [inputText, setInputText] = useState<string>("");
-  const [messages, setMessages] = useState<{ sender: string; text: string }[]>(
-    [],
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<"compare" | "single">("single");
   const [spaceImages, setSpaceImages] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -70,12 +85,67 @@ export default function DesignWorkspacePage() {
   >([]);
   const [versionCounter, setVersionCounter] = useState<number>(1.1);
   const [selectedAddress, setSelectedAddress] = useState<string>("");
+  const [pastedImages, setPastedImages] = useState<
+    { file: File; preview: string }[]
+  >([]);
+  const [pendingImage, setPendingImage] = useState<{
+    url: string;
+    description: string;
+  } | null>(null);
 
   const propertyId = useMemo(() => params?.id || "", [params?.id]);
 
   const selectedImages = useMemo(
     () => compsImages?.addresses?.[selectedAddress]?.images || [],
     [compsImages?.addresses, selectedAddress],
+  );
+
+  const selectedPreviewImages = useMemo(() => {
+    const baseline = spaceImages
+      .filter((img) => selectedBaselineIds.includes(img.id))
+      .map((img) => ({ ...img, source: "baseline" }));
+
+    const comps = selectedImages
+      .filter((img: any) => selectedCompsIds.includes(img.id))
+      .map((img: any) => ({ ...img, source: "comps" }));
+
+    return [...baseline, ...comps];
+  }, [spaceImages, selectedImages, selectedBaselineIds, selectedCompsIds]);
+
+  const allPreviewImages = useMemo(() => {
+    const selected = selectedPreviewImages.map((img: any) => ({
+      id: img.id,
+      url: img.url,
+      type: img.source, // baseline | comps
+    }));
+
+    const pasted = pastedImages.map((img, index) => ({
+      id: `pasted-${index}`,
+      url: img.preview,
+      type: "pasted",
+    }));
+
+    return [...selected, ...pasted];
+  }, [selectedPreviewImages, pastedImages]);
+
+  const handleRemoveSelected = useCallback(
+    (img: any) => {
+      if (img.type === "baseline") {
+        setSelectedBaselineIds((prev) => prev.filter((x) => x !== img.id));
+      } else if (img.type === "comps") {
+        setSelectedCompsIds((prev) => prev.filter((x) => x !== img.id));
+      } else if (img.type === "pasted") {
+        const index = pastedImages.findIndex(
+          (_, i) => `pasted-${i}` === img.id,
+        );
+
+        if (index !== -1) {
+          URL.revokeObjectURL(pastedImages[index].preview);
+          setPastedImages((prev) => prev.filter((_, i) => i !== index));
+        }
+      }
+    },
+    [pastedImages],
   );
 
   const toggleBaselineSelect = useCallback((id: string) => {
@@ -125,46 +195,40 @@ export default function DesignWorkspacePage() {
   );
 
   const handleExecute = useCallback(async () => {
-    if (selectedBaselineIds?.length === 0 && selectedCompsIds?.length === 0) {
+    if (isGenerating) return;
+
+    if (
+      selectedBaselineIds.length === 0 &&
+      selectedCompsIds.length === 0 &&
+      pastedImages.length === 0
+    ) {
       showSnackbar(
-        "Please select at least one image (Baseline or Market Comps) to generate a new design",
+        "Please select at least one image (Baseline, Market Comps, or add an image)",
         "warning",
       );
       return;
     }
 
-    if (!inputText?.trim()) return;
+    if (!inputText.trim() && allPreviewImages.length === 0) return;
 
     const userMessage = inputText;
 
-    // Add user message
-    setMessages((prev) => [...prev, { sender: "user", text: userMessage }]);
+    const chatImages = allPreviewImages.map((img) => ({
+      url: img.url,
+    }));
 
-    setInputText("");
-
-    // Show generating message
-    setIsGenerating(true);
-    setMessages((prev) => [
-      ...prev,
-      { sender: "ai", text: "Generating your design..." },
-    ]);
+    /* ========= BUILD PAYLOAD ========= */
 
     const images: Record<string, string> = {};
 
-    // Baseline images
-    selectedBaselineIds?.forEach((id) => {
+    selectedBaselineIds.forEach((id) => {
       const img = spaceImages?.find((i) => i.id === id);
-      if (img) {
-        images[id] = img?.category || activeSpace;
-      }
+      if (img) images[id] = img?.category || activeSpace;
     });
 
-    // Comps images
-    selectedCompsIds?.forEach((id) => {
+    selectedCompsIds.forEach((id) => {
       const img = selectedImages?.find((i: any) => i.id === id);
-      if (img) {
-        images[id] = img?.category || selectedAddress;
-      }
+      if (img) images[id] = img?.category || selectedAddress;
     });
 
     const payload = {
@@ -174,54 +238,78 @@ export default function DesignWorkspacePage() {
       user_id: userId,
     };
 
+    /* ========= ADD USER MESSAGE IMMEDIATELY ========= */
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: "user",
+        text: userMessage,
+        images: chatImages,
+      },
+    ]);
+
+    /* ========= CLEAR INPUT UI IMMEDIATELY ========= */
+
+    setInputText("");
+
+    pastedImages.forEach((img) => URL.revokeObjectURL(img.preview));
+    setPastedImages([]);
+
+    setSelectedBaselineIds([]);
+    setSelectedCompsIds([]);
+
+    /* ========= SHOW LOADING AI MESSAGE ========= */
+
+    setIsGenerating(true);
+    setMessages((prev) => [
+      ...prev,
+      { sender: "ai", text: "Generating your design..." },
+    ]);
+
     try {
       const res = await api.regenerateDesign(payload);
 
       const newImageUrl = res?.regenerated_images?.[0]?.url;
+      if (!newImageUrl) throw new Error("No image returned");
 
-      if (!newImageUrl) {
-        throw new Error("No image returned");
-      }
-
-      // Remove loading message
       setIsGenerating(false);
+
+      /* ========= REMOVE LOADING ========= */
       setMessages((prev) => prev.slice(0, -1));
 
-      // Add real AI message
+      /* ========= ADD AI RESPONSE ========= */
       setMessages((prev) => [
         ...prev,
         {
           sender: "ai",
           text: res?.description || "New design generated.",
         },
-      ]);
-
-      // SET CURRENT ITERATION IMAGE
-      setCurrentImage(newImageUrl);
-
-      // ADD TO ITERATION HISTORY
-      const newVersion = `v${versionCounter?.toFixed(1)}`;
-
-      setIterationHistory((prev) => [
         {
-          v: newVersion,
-          url: newImageUrl,
-          description: res?.description,
+          sender: "ai",
+          text: "Here’s a new concept. Want to add this to your iteration timeline?",
         },
-        ...prev,
       ]);
 
-      // Increment version
-      setVersionCounter((v) => v + 0.1);
+      setPendingImage({
+        url: newImageUrl,
+        description: res?.description || "New design generated.",
+      });
     } catch (err) {
       setIsGenerating(false);
+
+      /* ========= REMOVE LOADING ONLY ========= */
       setMessages((prev) => prev.slice(0, -1));
+
       showSnackbar("Failed to regenerate design", "error");
     }
   }, [
+    isGenerating,
     selectedBaselineIds,
     selectedCompsIds,
+    pastedImages,
     inputText,
+    allPreviewImages,
     propertyId,
     userId,
     showSnackbar,
@@ -229,8 +317,31 @@ export default function DesignWorkspacePage() {
     activeSpace,
     selectedImages,
     selectedAddress,
-    versionCounter,
   ]);
+
+  const handleAcceptGenerated = useCallback(() => {
+    if (!pendingImage) return;
+
+    const newVersion = `v${versionCounter.toFixed(1)}`;
+
+    setCurrentImage(pendingImage.url);
+
+    setIterationHistory((prev) => [
+      {
+        v: newVersion,
+        url: pendingImage.url,
+        description: pendingImage.description,
+      },
+      ...prev,
+    ]);
+
+    setVersionCounter((v) => v + 0.1);
+    setPendingImage(null);
+  }, [pendingImage, versionCounter]);
+
+  const handleRejectGenerated = useCallback(() => {
+    setPendingImage(null);
+  }, []);
 
   const loadDetails = useCallback(async () => {
     try {
@@ -238,30 +349,39 @@ export default function DesignWorkspacePage() {
 
       setPropertyDetails(details);
 
+      const categoriesObj = details?.files?.mls_images?.categories || {};
+
       // ---------- GET MLS IMAGES ----------
-      const mlsImages = details?.files?.mls_images?.images || [];
-
-      // ---------- EXTRACT SPACES (KEEP UNKNOWN) ----------
-      const extractedSpaces: string[] = Array.from(
-        new Set(
-          mlsImages.map((img: any) => {
-            const cat = img?.category as string | undefined;
-
-            return cat && cat?.includes("-")
-              ? cat.split("-").slice(1).join("-").trim()
-              : cat || "Unknown";
-          }),
-        ),
+      const mlsImages = Object.values(categoriesObj).flatMap(
+        (cat: any) => cat?.images || [],
       );
 
-      // Sort alphabetically
-      extractedSpaces?.sort();
+      const spaceMap = new Map<string, string>(); // key = lowercase, value = Title Case
 
-      // Move "Unknown" to the bottom if present
-      const unknownIndex = extractedSpaces?.indexOf("unknown");
+      Object.entries(categoriesObj).forEach(([cat, data]: any) => {
+        const hasImages = (data?.images || []).length > 0;
+
+        if (!hasImages) return;
+
+        const title = getRoomName(cat);
+        const normalized = title.toLowerCase();
+
+        if (!spaceMap.has(normalized)) {
+          spaceMap.set(normalized, title);
+        }
+      });
+
+      let extractedSpaces = Array.from(spaceMap.values());
+
+      extractedSpaces.sort((a, b) => a.localeCompare(b));
+
+      const unknownIndex = extractedSpaces.findIndex(
+        (s) => s.toLowerCase() === "unknown",
+      );
+
       if (unknownIndex !== -1) {
-        extractedSpaces?.splice(unknownIndex, 1);
-        extractedSpaces?.push("Unknown");
+        const [unknown] = extractedSpaces.splice(unknownIndex, 1);
+        extractedSpaces.push(unknown);
       }
 
       const finalSpaces =
@@ -274,14 +394,14 @@ export default function DesignWorkspacePage() {
       // ---------- GROUP IMAGES BY ROOM (INCLUDING UNKNOWN) ----------
       const groupedImages: Record<string, any[]> = {};
 
-      mlsImages?.forEach((img: any) => {
-        let room =
-          img?.category && img?.category?.includes("-")
-            ? img?.category.split("-").slice(1).join("-").trim()
-            : img?.category || "Unknown";
+      Object.entries(categoriesObj).forEach(([categoryName, data]: any) => {
+        const room = getRoomName(categoryName);
 
         if (!groupedImages[room]) groupedImages[room] = [];
-        groupedImages[room]?.push(img);
+
+        (data?.images || []).forEach((img: any) => {
+          groupedImages[room].push(img);
+        });
       });
 
       // ---------- SET DEFAULT IMAGES ----------
@@ -301,6 +421,36 @@ export default function DesignWorkspacePage() {
       showSnackbar("Failed to load property details", "error");
     }
   }, [propertyId, userId, showSnackbar]);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        if (item.type.startsWith("image")) {
+          const file = item.getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length === 0) return;
+
+      e.preventDefault();
+
+      const mapped = imageFiles.map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }));
+
+      setPastedImages((prev) => [...prev, ...mapped]);
+    },
+    [],
+  );
 
   useEffect(() => {
     scrollToBottom();
@@ -328,20 +478,22 @@ export default function DesignWorkspacePage() {
   useEffect(() => {
     if (!propertyDetails) return;
 
-    const mlsImages = propertyDetails?.files?.mls_images?.images || [];
+    const categoriesObj = propertyDetails?.files?.mls_images?.categories || {};
 
-    const imagesForSpace = mlsImages?.filter((img: any) => {
-      const raw = img?.category || "";
+    const groupedImages: Record<string, any[]> = {};
 
-      const room =
-        raw && raw?.includes("-")
-          ? raw?.split("-").slice(1).join("-").trim()
-          : raw;
+    Object.entries(categoriesObj).forEach(([categoryName, data]: any) => {
+      const room = getRoomName(categoryName);
 
-      return room?.toLowerCase() === activeSpace?.toLowerCase();
+      if (!groupedImages[room]) groupedImages[room] = [];
+
+      (data?.images || []).forEach((img: any) => {
+        groupedImages[room].push(img);
+      });
     });
 
-    setSpaceImages(imagesForSpace);
+    setSpaceImages(groupedImages[activeSpace] || []);
+    setCurrentIndex(0);
   }, [propertyDetails, activeSpace]);
 
   return (
@@ -363,7 +515,11 @@ export default function DesignWorkspacePage() {
           flex={{ md: 2 }}
           width={{ xs: "100%", md: "calc(100vw - 540px)" }}
           maxWidth="100%"
-          sx={{ overflowX: "hidden" }}
+          sx={{
+            overflowX: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
         >
           <Box
             display="flex"
@@ -537,33 +693,37 @@ export default function DesignWorkspacePage() {
                       />
                     )}
 
-                    <IconButton
-                      onClick={(e) => handlePrev(e)}
-                      sx={{
-                        position: "absolute",
-                        left: 16,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        bgcolor: "white",
-                        boxShadow: 2,
-                      }}
-                    >
-                      <ChevronLeft />
-                    </IconButton>
+                    {spaceImages?.length > 1 && (
+                      <>
+                        <IconButton
+                          onClick={(e) => handlePrev(e)}
+                          sx={{
+                            position: "absolute",
+                            left: 16,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            bgcolor: "white",
+                            boxShadow: 2,
+                          }}
+                        >
+                          <ChevronLeft />
+                        </IconButton>
 
-                    <IconButton
-                      onClick={(e) => handleNext(e)}
-                      sx={{
-                        position: "absolute",
-                        right: 16,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        bgcolor: "white",
-                        boxShadow: 2,
-                      }}
-                    >
-                      <ChevronRight />
-                    </IconButton>
+                        <IconButton
+                          onClick={(e) => handleNext(e)}
+                          sx={{
+                            position: "absolute",
+                            right: 16,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            bgcolor: "white",
+                            boxShadow: 2,
+                          }}
+                        >
+                          <ChevronRight />
+                        </IconButton>
+                      </>
+                    )}
 
                     <Chip
                       label={`${currentIndex + 1} / ${spaceImages?.length}`}
@@ -949,6 +1109,8 @@ export default function DesignWorkspacePage() {
           display="flex"
           flexDirection="column"
           flex={1}
+          minWidth={0}
+          height={iterationHistory?.length > 0 ? "100vh" : "calc(100vh - 70px)"}
         >
           <Paper
             sx={{
@@ -960,7 +1122,8 @@ export default function DesignWorkspacePage() {
               flexDirection: "column",
               boxShadow: "0px 4px 12px rgba(0,0,0,0.06)",
               bgcolor: "#FFFFFF",
-              height: "100%",
+              flex: 1,
+              minHeight: 0,
             }}
           >
             {/* HEADER */}
@@ -988,7 +1151,10 @@ export default function DesignWorkspacePage() {
                 "&::-webkit-scrollbar": { display: "none" },
                 scrollbarWidth: "none",
                 msOverflowStyle: "none",
+                maxWidth: "100%",
+                minWidth: 0,
               }}
+              minHeight={0}
             >
               {messages?.map((msg, index) =>
                 msg?.sender === "ai" ? (
@@ -998,6 +1164,7 @@ export default function DesignWorkspacePage() {
                     gap={1}
                     alignItems="flex-start"
                   >
+                    {/* AVATAR */}
                     <Box
                       sx={{
                         width: 32,
@@ -1013,13 +1180,28 @@ export default function DesignWorkspacePage() {
                       <AutoAwesome fontSize="small" />
                     </Box>
 
+                    {/* BUBBLE */}
                     <Paper
                       sx={{
                         p: 2,
                         borderRadius: 2,
-                        border: `1px solid ${ui.border}`,
-                        bgcolor: "#F3F5F7",
+                        bgcolor: "#EAECEF",
+                        color: "white",
+                        alignSelf: "flex-end",
+
                         maxWidth: "85%",
+                        width: "fit-content",
+
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+
+                        maxHeight: 240,
+                        overflowY: "auto",
+
+                        wordBreak: "break-word",
+                        whiteSpace: "pre-wrap",
+
                         ...(isGenerating && index === messages?.length - 1
                           ? {
                               animation: "blink 1.2s infinite",
@@ -1032,7 +1214,26 @@ export default function DesignWorkspacePage() {
                           : {}),
                       }}
                     >
-                      {msg?.text}
+                      {msg?.images && msg.images.length > 0 && (
+                        <Box display="flex" gap={1} flexWrap="wrap">
+                          {msg.images.map((img, i) => (
+                            <Box
+                              key={i}
+                              component="img"
+                              src={img.url}
+                              sx={{
+                                width: 72,
+                                height: 72,
+                                objectFit: "cover",
+                                borderRadius: 1.5,
+                                border: `1px solid ${ui.border}`,
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      )}
+
+                      <Typography color="#000"> {msg?.text}</Typography>
                     </Paper>
                   </Box>
                 ) : (
@@ -1041,15 +1242,99 @@ export default function DesignWorkspacePage() {
                     sx={{
                       p: 2,
                       borderRadius: 2,
-                      bgcolor: ui.primary,
+                      bgcolor: "#EAECEF",
                       color: "white",
                       alignSelf: "flex-end",
                       maxWidth: "85%",
                     }}
                   >
-                    {msg?.text}
+                    {msg?.images && msg.images.length > 0 && (
+                      <Box mt={1} display="flex" gap={1} flexWrap="wrap">
+                        {msg.images.map((img, i) => (
+                          <Box
+                            key={i}
+                            component="img"
+                            src={img.url}
+                            sx={{
+                              width: 72,
+                              height: 72,
+                              objectFit: "cover",
+                              borderRadius: 1.5,
+                              border: "1px solid rgba(255,255,255,0.25)",
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    )}
+
+                    <Typography color="#000"> {msg?.text}</Typography>
                   </Paper>
                 ),
+              )}
+
+              {pendingImage && (
+                <Box display="flex" gap={1} alignItems="flex-start">
+                  <Box
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      bgcolor: "#EAECEF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <AutoAwesome fontSize="small" />
+                  </Box>
+
+                  <Paper
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: `1px solid ${ui.border}`,
+                      bgcolor: "#F3F5F7",
+                      maxWidth: "85%",
+                    }}
+                  >
+                    {/* IMAGE PREVIEW */}
+                    <Box
+                      component="img"
+                      src={pendingImage.url}
+                      sx={{
+                        width: 220,
+                        borderRadius: 2,
+                        mb: 1.5,
+                      }}
+                    />
+
+                    <Typography fontSize={13} sx={{ mb: 1 }}>
+                      Add this to your timeline?
+                    </Typography>
+
+                    <Box display="flex" gap={1}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={handleAcceptGenerated}
+                        sx={{ textTransform: "none" }}
+                        color="inherit"
+                      >
+                        Looks Great ✨
+                      </Button>
+
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleRejectGenerated}
+                        sx={{ textTransform: "none" }}
+                        color="inherit"
+                      >
+                        Try Another
+                      </Button>
+                    </Box>
+                  </Paper>
+                </Box>
               )}
 
               {/* Auto-scroll anchor */}
@@ -1065,37 +1350,102 @@ export default function DesignWorkspacePage() {
                 borderRadius: 4,
                 backgroundColor: "#F3F5F7",
                 px: 2,
-                py: 1.6,
-                minHeight: 64,
+                py: 1.5,
                 display: "flex",
-                alignItems: "flex-end",
-                gap: 1,
+                flexDirection: "column",
+                gap: 1.2,
               }}
             >
+              {allPreviewImages?.length > 0 && !isGenerating && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 1.2,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    mb: 1.2,
+                  }}
+                >
+                  {allPreviewImages?.map((img) => (
+                    <Box
+                      key={img.id}
+                      sx={{
+                        position: "relative",
+                        width: 80,
+                        height: 80,
+                        borderRadius: 2,
+                        overflow: "hidden",
+                        border: `1px solid ${ui.border}`,
+                        boxShadow: "0px 2px 4px rgba(0,0,0,0.08)",
+                        flexShrink: 0,
+                        bgcolor: "#fff",
+                      }}
+                    >
+                      <img
+                        src={img.url}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveSelected(img)}
+                        sx={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          width: 16,
+                          height: 16,
+                          bgcolor: "rgba(0,0,0,0.65)",
+                          color: "#fff",
+                          zIndex: 2,
+                          "&:hover": {
+                            bgcolor: "rgba(0,0,0,0.85)",
+                          },
+                        }}
+                      >
+                        <Typography fontSize={12} lineHeight={1}>
+                          <CloseIcon sx={{ fontSize: 12 }} />
+                        </Typography>
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Direct the AI: 'Change the countertop to marble'..."
+                placeholder={
+                  selectedPreviewImages.length > 0
+                    ? ""
+                    : "Direct the AI: 'Change the countertop to marble'..."
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleExecute();
                   }
                 }}
+                onPaste={handlePaste}
                 rows={3}
                 style={{
                   flex: 1,
+                  minHeight: 72,
+                  maxHeight: 140,
+                  overflowY: "auto",
                   border: "none",
                   background: "transparent",
                   outline: "none",
                   fontSize: 15,
                   lineHeight: "1.6",
-                  padding: "10px 0",
                   color: ui.text,
                   resize: "none",
                   fontFamily: "inherit",
-                  overflow: "hidden",
-                  borderRadius: 0,
                 }}
               />
 
@@ -1103,6 +1453,7 @@ export default function DesignWorkspacePage() {
               <Button
                 variant="contained"
                 onClick={handleExecute}
+                disabled={isGenerating}
                 sx={{
                   bgcolor: ui.primary,
                   color: "white",

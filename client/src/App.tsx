@@ -13,6 +13,7 @@ import PhotoSelectionPage from "@/pages/PhotoSelectionPage";
 import DesignWorkspacePage from "@/pages/DesignWorkspacePage";
 import { ThemeProvider } from "@mui/material";
 import { theme } from "./theme";
+import FinalPropertySelection from "./pages/FinalPropertySelectionPage";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/new-project" component={ProjectSetupPage} />
       <Route path="/organize/:id" component={PhotoSelectionPage} />
       <Route path="/studio/:id" component={DesignWorkspacePage} />
+      <Route path="/property-selection" component={FinalPropertySelection} />
       <Route component={NotFoundPage} />
     </Switch>
   );

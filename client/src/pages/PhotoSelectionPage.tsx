@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -26,7 +26,8 @@ import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import AppNavbar from "@/components/AppNavBar";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { Photo } from "@/types";
+import { DeleteTarget, Photo } from "@/types";
+import RenameCategoryDialog from "@/components/RenameCategoryDialog";
 
 /* ===== DESIGN TOKENS ===== */
 const ui = {
@@ -52,43 +53,16 @@ export default function PhotoSelectionPage() {
   const [loading, setLoading] = useState(true);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
-  const [deletePhoto, setDeletePhoto] = useState<Photo | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameCategoryName, setRenameCategoryName] = useState<string>("");
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const propertyId = useMemo(() => params.id || "", [params.id]);
 
-  const categoryData = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          photos.map((p) => [
-            (p.roomCategory || "Unknown").toLowerCase(),
-            p.roomCategory || "Unknown",
-          ]),
-        ).values(),
-      ),
-    [photos],
-  );
-
-  const getCategoryImageCount = useCallback(
-    (category: string) => {
-      return photos?.filter((p) => p.roomCategory === category)?.length;
-    },
-    [photos],
-  );
-
-  const isSingleImageCategory = useMemo(
-    () => deletePhoto && getCategoryImageCount(deletePhoto?.roomCategory) === 1,
-    [deletePhoto, getCategoryImageCount],
-  );
-
-  const deleteDescription = useMemo(
-    () =>
-      isSingleImageCategory
-        ? "Deleting this image will also delete the category. Are you sure you want to delete both? This action cannot be reversed."
-        : "Are you sure you want to delete this image? This action cannot be reversed.",
-    [isSingleImageCategory],
-  );
+  const categoryData = useMemo(() => categories, [categories]);
 
   const dynamicCategories = useMemo(
     () =>
@@ -109,38 +83,48 @@ export default function PhotoSelectionPage() {
 
   const loadPropertyImages = useCallback(async () => {
     if (!propertyId || !userId) return;
+
     try {
-      if (userId && propertyId) {
-        const details = await api.getPropertyDetails(propertyId, userId);
-        const mlsImages = details?.files?.mls_images?.images || [];
-        const loadedPhotos = mlsImages?.map((file: any) => {
-          let roomCategory =
-            file.category && file.category.includes("-")
-              ? file.category.split("-").slice(1).join("-").trim()
-              : file.category || "Unknown";
+      const details = await api.getPropertyDetails(propertyId, userId);
 
-          roomCategory =
-            roomCategory.charAt(0).toUpperCase() +
-            roomCategory.slice(1).toLowerCase();
+      const categoriesObj = details?.files?.mls_images?.categories || {};
 
-          return {
+      const formatCategory = (cat: string) =>
+        cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
+
+      const allCategoryNames = Object.keys(categoriesObj)
+        .map(formatCategory)
+        .filter((value, index, self) => self.indexOf(value) === index);
+
+      setCategories(allCategoryNames);
+
+      // Flatten only images into photos
+      const allImages = Object.entries(categoriesObj).flatMap(
+        ([categoryName, categoryData]: any) => {
+          const formattedCategory = formatCategory(categoryName);
+
+          return (categoryData?.images || []).map((file: any) => ({
             id: file?.id,
             src: file?.url,
-            rawCategory: file?.category || "Unknown",
-            roomCategory,
+            rawCategory: categoryName,
+            roomCategory: formattedCategory,
             selected: false,
             filename: file?.filename,
-          };
-        });
+          }));
+        },
+      );
 
-        setPhotos(loadedPhotos);
+      setPhotos(allImages);
 
-        // Set first category as default selection
-        const firstCategory = loadedPhotos?.find(
-          (p: any) => p.roomCategory.toLowerCase() !== "unknown",
-        )?.roomCategory;
+      // Default category selection
+      const firstWithImage = allCategoryNames.find((cat) =>
+        allImages.some((img) => img.roomCategory === cat),
+      );
 
-        if (firstCategory) setSelectedCategory(firstCategory);
+      if (firstWithImage) {
+        setSelectedCategory(firstWithImage);
+      } else if (allCategoryNames.length > 0) {
+        setSelectedCategory(allCategoryNames[0]);
       }
     } catch (error) {
       showSnackbar("Failed to load images", "error");
@@ -164,6 +148,7 @@ export default function PhotoSelectionPage() {
       try {
         await api.updateImageCategory(propertyId, id, newRoom, String(userId));
         showSnackbar("Image moved", "success");
+        loadPropertyImages();
       } catch {
         showSnackbar("Failed to move image", "error");
         loadPropertyImages();
@@ -177,52 +162,88 @@ export default function PhotoSelectionPage() {
   }, [propertyId, setLocation]);
 
   const deletePhotoFn = useCallback(async () => {
-    if (!deletePhoto) return;
-
-    const deletedCategory = deletePhoto?.roomCategory;
+    if (!deleteTarget) return;
 
     try {
       setDeleteLoading(true);
 
-      const updatedPhotos = photos.filter((p) => p.id !== deletePhoto.id);
-      setPhotos(updatedPhotos);
+      if (deleteTarget.type === "image") {
+        const photo = deleteTarget.photo;
 
-      await api.deleteImage(propertyId, deletePhoto.id, String(userId));
+        const updatedPhotos = photos.filter((p) => p.id !== photo.id);
+        setPhotos(updatedPhotos);
 
-      showSnackbar("Image deleted successfully", "success");
+        await api.deleteImage(propertyId, photo.id, String(userId));
 
-      const remainingInCategory = updatedPhotos.filter(
-        (p) => p.roomCategory === deletedCategory,
-      );
-
-      if (remainingInCategory.length === 0) {
-        const unknownCategory = updatedPhotos?.find(
-          (p) => p.roomCategory.toLowerCase() === "unknown",
-        )?.roomCategory;
-
-        if (unknownCategory) {
-          setSelectedCategory(unknownCategory);
-        } else if (updatedPhotos?.length > 0) {
-          setSelectedCategory(updatedPhotos[0]?.roomCategory);
-        } else {
-          setSelectedCategory("");
-        }
+        showSnackbar("Image deleted successfully", "success");
       }
-    } catch (err) {
-      showSnackbar("Failed to delete image", "error");
+
+      if (deleteTarget.type === "category") {
+        await api.deleteCategory(
+          propertyId,
+          String(userId),
+          deleteTarget.category,
+          true,
+        );
+
+        showSnackbar("Category deleted", "success");
+      }
+
+      loadPropertyImages();
+    } catch {
+      showSnackbar("Delete failed", "error");
       loadPropertyImages();
     } finally {
       setDeleteLoading(false);
-      setDeletePhoto(null);
+      setDeleteTarget(null);
     }
   }, [
-    deletePhoto,
-    loadPropertyImages,
+    deleteTarget,
     photos,
     propertyId,
-    showSnackbar,
     userId,
+    showSnackbar,
+    loadPropertyImages,
   ]);
+
+  const renameCategory = useCallback(
+    async (oldName: string, newName: string) => {
+      if (!newName || oldName === newName) {
+        setRenameDialogOpen(false);
+        return;
+      }
+
+      try {
+        setRenameLoading(true);
+
+        setCategories((prev) =>
+          prev.map((cat) => (cat === oldName ? newName : cat)),
+        );
+
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.roomCategory === oldName ? { ...p, roomCategory: newName } : p,
+          ),
+        );
+
+        if (selectedCategory === oldName) {
+          setSelectedCategory(newName);
+        }
+
+        await api.renameCategory(propertyId, oldName, newName, String(userId));
+
+        showSnackbar("Category renamed", "success");
+        loadPropertyImages();
+      } catch {
+        showSnackbar("Failed to rename category", "error");
+        loadPropertyImages();
+      } finally {
+        setRenameLoading(false);
+        setRenameDialogOpen(false);
+      }
+    },
+    [propertyId, userId, selectedCategory, showSnackbar, loadPropertyImages],
+  );
 
   useEffect(() => {
     if (!propertyId || !userId) {
@@ -337,7 +358,7 @@ export default function PhotoSelectionPage() {
                       sx={{
                         fontSize: 14,
                         letterSpacing: 1,
-                        lineHeight: 1.3,
+                        lineHeight: 1,
                         whiteSpace: "normal",
                         wordBreak: "break-word",
                       }}
@@ -372,8 +393,8 @@ export default function PhotoSelectionPage() {
                       size="small"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const newName = prompt("Rename category:", cat?.label);
-                        // if (newName) renameCategory(cat.label, newName);
+                        setRenameCategoryName(cat.label);
+                        setRenameDialogOpen(true);
                       }}
                       sx={{
                         color:
@@ -387,7 +408,10 @@ export default function PhotoSelectionPage() {
                       size="small"
                       onClick={(e) => {
                         e.stopPropagation();
-                        // deleteCategory(cat.label);
+                        setDeleteTarget({
+                          type: "category",
+                          category: cat.label,
+                        });
                       }}
                       sx={{
                         color:
@@ -435,6 +459,11 @@ export default function PhotoSelectionPage() {
               </Typography>
             </Box>
 
+            {filteredPhotos.length === 0 && (
+              <Typography sx={{ color: ui.muted, mt: 4 }}>
+                No images in this category
+              </Typography>
+            )}
             <Grid container spacing={3}>
               {filteredPhotos?.map((photo) => (
                 <Grid key={photo?.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
@@ -488,7 +517,7 @@ export default function PhotoSelectionPage() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDeletePhoto(photo);
+                          setDeleteTarget({ type: "image", photo });
                         }}
                       >
                         <DeleteOutline sx={{ color: ui.text, fontSize: 18 }} />
@@ -569,7 +598,7 @@ export default function PhotoSelectionPage() {
             sx={{
               bgcolor: "#000",
               color: "#fff",
-              borderRadius: 999,
+              borderRadius: 20,
               textTransform: "uppercase",
               letterSpacing: 1,
               fontSize: 12,
@@ -584,14 +613,28 @@ export default function PhotoSelectionPage() {
       </Box>
 
       <ConfirmDialog
-        open={Boolean(deletePhoto)}
-        title="Delete Image"
-        description={deleteDescription}
+        open={Boolean(deleteTarget)}
+        title={
+          deleteTarget?.type === "category" ? "Delete Category" : "Delete Image"
+        }
+        description={
+          deleteTarget?.type === "category"
+            ? `Are you sure you want to delete ${deleteTarget.category} category? This action cannot be reversed.`
+            : "Are you sure you want to delete this image? This action cannot be reversed."
+        }
         onConfirm={deletePhotoFn}
-        onCancel={() => setDeletePhoto(null)}
+        onCancel={() => setDeleteTarget(null)}
         confirmText="Yes, Delete"
         cancelText="Cancel"
         loading={deleteLoading}
+      />
+
+      <RenameCategoryDialog
+        open={renameDialogOpen}
+        initialValue={renameCategoryName}
+        loading={renameLoading}
+        onCancel={() => setRenameDialogOpen(false)}
+        onConfirm={(newName) => renameCategory(renameCategoryName, newName)}
       />
     </>
   );

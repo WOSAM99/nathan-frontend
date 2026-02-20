@@ -119,6 +119,9 @@ export default function AppNavbar({
               fontSize: 12,
               letterSpacing: 1,
             }}
+            onClick={() => {
+              setLocation("/property-selection");
+            }}
           >
             EXPORT PACKAGE
           </Button>
