@@ -112,7 +112,6 @@ export interface AppNavbarProps {
   onBack?: () => void;
   propertyId?: string;
   bgcolor?: string;
-  exportPackage?: boolean;
 }
 
 export interface ConfirmDialogProps {
