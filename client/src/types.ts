@@ -74,6 +74,7 @@ export interface PropertyDetails {
   created_at: string;
   chat_history: any[];
   images: any[];
+  iteration_history: any[];
 }
 
 export interface Room {
@@ -181,3 +182,11 @@ export interface AddCategoryModalProps {
 export interface CategoryFormValues {
   categoryName: string;
 }
+
+export interface IterationItem {
+  id: string;
+  v: string;
+  url: string;
+  description: string;
+  category: string;
+};

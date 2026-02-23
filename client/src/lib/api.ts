@@ -408,6 +408,21 @@ class ApiClient {
       },
     );
   }
+
+  async deleteIterationImages(
+    property_id: string,
+    image_ids: string[],
+    user_id?: string,
+  ): Promise<null> {
+    return this.request<null>(`/chat/delete/iteration`, {
+      method: "DELETE",
+      body: JSON.stringify({
+        property_id,
+        image_id: image_ids,
+        user_id,
+      }),
+    });
+  }
 }
 
 
