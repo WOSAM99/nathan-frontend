@@ -9,11 +9,12 @@ import {
   DialogTitle,
   Typography,
   Chip,
+  CircularProgress,
 } from "@mui/material";
 import Check from "@mui/icons-material/Check";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "@/lib/api";
 
 const ui = {
@@ -37,6 +38,67 @@ export default function FinalSelectionModal({
   const [isExporting, setIsExporting] = useState(false);
 
   const totalSelected = Object.values(exportSelections).flat().length;
+
+  const toggleSelection = (category: string, item: any) => {
+    setExportSelections((prev: any) => {
+      const categoryItems = prev[category] || [];
+
+      const exists = categoryItems.some((i: any) => i.url === item.url);
+
+      const updatedCategory = exists
+        ? categoryItems.filter((i: any) => i.url !== item.url)
+        : [...categoryItems, item];
+
+      return {
+        ...prev,
+        [category]: updatedCategory,
+      };
+    });
+  };
+
+  const exportPackageFn = useCallback(async () => {
+    const selectedImages = Object.entries(exportSelections).flatMap(
+      ([category, items]: any) =>
+        items.map((i: any) => ({
+          category,
+          url: i.url,
+          description: i.description,
+        })),
+    );
+
+    if (selectedImages.length === 0) {
+      showSnackbar("Select at least one image", "warning");
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+
+      await api.storeFinalImages({
+        property_id: propertyId,
+        user_id: String(userId),
+        images: selectedImages,
+      });
+
+      showSnackbar("Export successful", "success");
+
+      setExportOpen(false);
+      setExportSelections({});
+      setLocation(`/property-selection/${propertyId}`);
+    } catch (err) {
+      showSnackbar("Export failed", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [
+    exportSelections,
+    propertyId,
+    setExportOpen,
+    setExportSelections,
+    setLocation,
+    showSnackbar,
+    userId,
+  ]);
 
   return (
     <Dialog
@@ -80,22 +142,43 @@ export default function FinalSelectionModal({
                 justifyContent="space-between"
                 mb={1}
               >
-                <Typography fontWeight={600}>{category}</Typography>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Typography fontWeight={600}>{category}</Typography>
 
-                <Chip
-                  label={
-                    items.length > 1
-                      ? `${items.length} images`
-                      : `${items.length} image`
-                  }
+                  <Chip
+                    label={
+                      items.length > 1
+                        ? `${items.length} images`
+                        : `${items.length} image`
+                    }
+                    size="small"
+                    sx={{
+                      bgcolor: "#EEF2FF",
+                      color: "#000",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  />
+                </Box>
+
+                {/* SELECT ALL BUTTON */}
+                <Button
                   size="small"
-                  sx={{
-                    bgcolor: "#EEF2FF",
-                    color: "#000",
-                    fontSize: 12,
-                    fontWeight: 600,
+                  onClick={() => {
+                    const allSelected =
+                      exportSelections[category]?.length === items.length;
+
+                    setExportSelections((prev: any) => ({
+                      ...prev,
+                      [category]: allSelected ? [] : items,
+                    }));
                   }}
-                />
+                  color="inherit"
+                >
+                  {exportSelections[category]?.length === items.length
+                    ? "Unselect All"
+                    : "Select All"}
+                </Button>
               </Box>
 
               {/* IMAGE GRID */}
@@ -114,43 +197,7 @@ export default function FinalSelectionModal({
                   return (
                     <Card
                       key={item.url}
-                      onClick={async () => {
-                        const selectedImages = Object.entries(
-                          exportSelections,
-                        ).flatMap(([category, items]: any) =>
-                          items.map((i: any) => ({
-                            category,
-                            url: i.url,
-                            description: i.description,
-                          })),
-                        );
-
-                        if (selectedImages.length === 0) {
-                          showSnackbar("Select at least one image", "warning");
-                          return;
-                        }
-
-                        try {
-                          setIsExporting(true);
-
-                          await api.storeFinalImages({
-                            property_id: propertyId,
-                            user_id: String(userId),
-                            images: selectedImages,
-                          });
-
-                          showSnackbar("Export successful", "success");
-
-                          setExportOpen(false);
-                          setExportSelections({});
-
-                          setLocation("/property-selection");
-                        } catch (err) {
-                          showSnackbar("Export failed", "error");
-                        } finally {
-                          setIsExporting(false);
-                        }
-                      }}
+                      onClick={() => toggleSelection(category, item)}
                       sx={{
                         position: "relative",
                         cursor: "pointer",
@@ -223,28 +270,15 @@ export default function FinalSelectionModal({
         <Box display="flex" gap={1}>
           <Button
             variant="contained"
-            disabled={totalSelected === 0}
+            disabled={totalSelected === 0 || isExporting}
             sx={{ bgcolor: "#000", color: "#fff" }}
             color="inherit"
-            onClick={() => {
-              const selectedImages = Object.entries(exportSelections).flatMap(
-                ([category, items]: any) =>
-                  items.map((i: any) => ({
-                    category,
-                    url: i.url,
-                    description: i.description,
-                  })),
-              );
-
-              if (selectedImages.length === 0) {
-                showSnackbar("Select at least one image", "warning");
-                return;
-              }
-
-              setExportOpen(false);
-              setExportSelections({});
-              setLocation("/property-selection");
-            }}
+            onClick={exportPackageFn}
+            startIcon={
+              isExporting ? (
+                <CircularProgress size={16} sx={{ color: "#fff" }} />
+              ) : null
+            }
           >
             EXPORT
           </Button>
@@ -254,6 +288,7 @@ export default function FinalSelectionModal({
               setExportSelections({});
             }}
             color="inherit"
+            variant="outlined"
           >
             Cancel
           </Button>

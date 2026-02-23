@@ -23,7 +23,10 @@ function Router() {
       <Route path="/new-project" component={ProjectSetupPage} />
       <Route path="/organize/:id" component={PhotoSelectionPage} />
       <Route path="/studio/:id" component={DesignWorkspacePage} />
-      <Route path="/property-selection" component={FinalPropertySelection} />
+      <Route
+        path="/property-selection/:id"
+        component={FinalPropertySelection}
+      />
       <Route component={NotFoundPage} />
     </Switch>
   );

@@ -96,9 +96,6 @@ export default function DesignWorkspacePage() {
     url: string;
     description: string;
   } | null>(null);
-  const [compsViewMode, setCompsViewMode] = useState<"singleRow" | "scroll">(
-    "singleRow",
-  );
   const [isCompsExpanded, setIsCompsExpanded] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSelections, setExportSelections] = useState<
@@ -221,13 +218,9 @@ export default function DesignWorkspacePage() {
   const handleExecute = useCallback(async () => {
     if (isGenerating) return;
 
-    if (
-      selectedBaselineIds.length === 0 &&
-      selectedCompsIds.length === 0 &&
-      pastedImages.length === 0
-    ) {
+    if (selectedBaselineIds?.length === 0 && selectedCompsIds?.length === 0) {
       showSnackbar(
-        "Please select at least one image (Baseline, Market Comps, or add an image)",
+        "Please select at least one image (Baseline or Market Comps)",
         "warning",
       );
       return;
@@ -348,14 +341,11 @@ export default function DesignWorkspacePage() {
     const newVersion = `v${versionCounter.toFixed(1)}`;
 
     try {
-      /* ================= API CALL ================= */
-      // await api.storeIterationImages({
-      //   property_id: propertyId,
-      //   user_id: String(userId),
-      //   images: pendingImage.url,
-      // });
-
-      /* ================= UI UPDATE ================= */
+      await api.storeIterationImages({
+        property_id: propertyId,
+        user_id: String(userId),
+        images: pendingImage.url,
+      });
 
       // set current image
       setCurrentImage(pendingImage.url);
@@ -546,10 +536,6 @@ export default function DesignWorkspacePage() {
   );
 
   useEffect(() => {
-    setCompsViewMode("singleRow");
-  }, [selectedAddress]);
-
-  useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
@@ -595,26 +581,34 @@ export default function DesignWorkspacePage() {
 
   return (
     <>
-      <Box minHeight="100vh" bgcolor={ui.bg}>
+      <Box
+        height={{ xs: "auto", md: "100vh" }}
+        minHeight={{ xs: "100vh", md: "100vh" }}
+        bgcolor={ui.bg}
+        display="flex"
+        flexDirection="column"
+        overflow={{ xs: "auto", md: "hidden" }}
+      >
         {/* ================= MAIN LAYOUT ================= */}
         <Box
+          flex={1}
+          minHeight={0}
           display={{ xs: "block", md: "flex" }}
           gap={3}
           p={{ xs: 1.5, sm: 2, md: 3 }}
           alignItems="stretch"
           width="100%"
           maxWidth="100vw"
-          overflow="hidden"
         >
           {/* ========== LEFT PANEL ========== */}
           <Box
             flex={{ md: 2 }}
-            width={{ xs: "100%", md: "calc(100vw - 540px)" }}
-            maxWidth="100%"
             sx={{
-              overflowX: "hidden",
               display: "flex",
               flexDirection: "column",
+              minHeight: 0,
+              height: "100%",
+              overflow: "hidden",
             }}
           >
             <Box
@@ -685,654 +679,570 @@ export default function DesignWorkspacePage() {
               </ToggleButtonGroup>
             </Box>
 
-            {/* ========== BASELINE + CURRENT ITERATION ========== */}
-            <Grid container spacing={3} justifyContent="center">
-              {/* ================= BASELINE COLUMN ================= */}
-              <Grid
-                size={{ xs: 12, md: viewMode === "single" ? 12 : 6 }}
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                {/* HEADER ROW */}
-                <Box
-                  sx={{
-                    width: "100%",
-                    maxWidth: 420,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 2,
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: 16,
-                      letterSpacing: 1,
-                      color: "#000",
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                    }}
-                  >
-                    BASELINE
-                  </Typography>
-
-                  <FormControl size="small">
-                    <InputLabel>Select Space</InputLabel>
-                    <Select
-                      value={activeSpace}
-                      label="Select Space"
-                      onChange={(e) => setActiveSpace(e.target.value)}
-                      sx={{
-                        minWidth: { xs: 150, sm: 200 },
-                        bgcolor: "white",
-                        borderRadius: 2,
-                      }}
-                    >
-                      {spaces.map((space) => (
-                        <MenuItem key={space} value={space}>
-                          {space}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                {/* BASELINE CARD */}
-                <Card
-                  onClick={() =>
-                    toggleBaselineSelect(spaceImages[currentIndex]?.id)
-                  }
-                  sx={{
-                    borderRadius: ui.cardRadius,
-                    width: "100%",
-                    position: "relative",
-                    maxWidth: 420,
-                    aspectRatio: "4 / 3",
-                    overflow: "hidden",
-                    backgroundColor: "white",
-                    border: selectedBaselineIds?.includes(
-                      spaceImages[currentIndex]?.id,
-                    )
-                      ? `3px solid ${ui.blue}`
-                      : `1px solid ${ui.border}`,
-                    cursor: "pointer",
-                  }}
-                >
-                  {spaceImages?.length > 0 ? (
-                    <>
-                      <CardMedia
-                        component="img"
-                        image={spaceImages[currentIndex]?.url}
-                        sx={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          borderRadius: ui.cardRadius,
-                        }}
-                      />
-                      {selectedBaselineIds?.includes(
-                        spaceImages[currentIndex]?.id,
-                      ) && (
-                        <Check
-                          sx={{
-                            position: "absolute",
-                            top: 12,
-                            right: 12,
-                            bgcolor: ui.blue,
-                            color: "white",
-                            borderRadius: "50%",
-                            p: 0.6,
-                          }}
-                        />
-                      )}
-
-                      {spaceImages?.length > 1 && (
-                        <>
-                          <IconButton
-                            onClick={(e) => handlePrev(e)}
-                            sx={{
-                              position: "absolute",
-                              left: 16,
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              bgcolor: "white",
-                              boxShadow: 2,
-                            }}
-                          >
-                            <ChevronLeft />
-                          </IconButton>
-
-                          <IconButton
-                            onClick={(e) => handleNext(e)}
-                            sx={{
-                              position: "absolute",
-                              right: 16,
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              bgcolor: "white",
-                              boxShadow: 2,
-                            }}
-                          >
-                            <ChevronRight />
-                          </IconButton>
-                        </>
-                      )}
-
-                      <Chip
-                        label={`${currentIndex + 1} / ${spaceImages?.length}`}
-                        sx={{
-                          position: "absolute",
-                          bottom: 16,
-                          right: 16,
-                          bgcolor: "rgba(255,255,255,0.8)",
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <Box
-                      sx={{
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: ui.muted,
-                      }}
-                    >
-                      No images for {activeSpace}
-                    </Box>
-                  )}
-                </Card>
-              </Grid>
-
-              {/* ================= CURRENT ITERATION ================= */}
-              {viewMode === "compare" && currentImage && (
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                pr: 1,
+                "&::-webkit-scrollbar": { width: 6 },
+                "&::-webkit-scrollbar-thumb": {
+                  backgroundColor: "#D1D5DB",
+                  borderRadius: 3,
+                },
+                pt: 1,
+              }}
+            >
+              {/* ========== BASELINE + CURRENT ITERATION ========== */}
+              <Grid container spacing={3} justifyContent="center">
+                {/* ================= BASELINE COLUMN ================= */}
                 <Grid
-                  size={{ xs: 12, md: 6 }}
+                  size={{ xs: 12, md: viewMode === "single" ? 12 : 6 }}
                   sx={{
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
                   }}
                 >
+                  {/* HEADER ROW */}
                   <Box
                     sx={{
                       width: "100%",
                       maxWidth: 420,
-                      mb: 3,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 2,
                     }}
                   >
                     <Typography
                       sx={{
-                        mt: 1,
                         fontSize: 16,
                         letterSpacing: 1,
-                        color: "#2563EB",
+                        color: "#000",
                         textTransform: "uppercase",
                         fontWeight: 600,
-                        textAlign: "center",
                       }}
                     >
-                      CURRENT ITERATION
+                      BASELINE
                     </Typography>
-                  </Box>
 
-                  <Card
-                    sx={{
-                      width: "100%",
-                      maxWidth: 420,
-                      aspectRatio: "4 / 3",
-                      borderRadius: ui.cardRadius,
-                      overflow: "hidden",
-                      backgroundColor: "white",
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      image={currentImage}
-                      sx={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
-                  </Card>
-                </Grid>
-              )}
-            </Grid>
-
-            <Box mt={4}>
-              <Box
-                display="flex"
-                alignItems="center"
-                justifyContent="space-between"
-                mb={2}
-              >
-                <Box display="flex" alignItems="center" gap={1}>
-                  <History fontSize="small" sx={{ color: ui.muted }} />
-                  <Typography
-                    fontWeight={600}
-                    sx={{ fontSize: 16, letterSpacing: 1 }}
-                  >
-                    ITERATION HISTORY
-                  </Typography>
-                </Box>
-
-                {iterationHistory?.length > 0 && (
-                  <Box display="flex" gap={1}>
-                    <Button
-                      variant="contained"
-                      sx={{
-                        bgcolor: "#000",
-                        color: "white",
-                        borderRadius: 3,
-                        textTransform: "none",
-                        px: 2.5,
-                        fontSize: 12,
-                        letterSpacing: 1,
-                      }}
-                      onClick={() => setExportOpen(true)}
-                    >
-                      EXPORT PACKAGE
-                    </Button>
-                    <IconButton
-                      onClick={() =>
-                        document.getElementById("iter-carousel")?.scrollBy({
-                          left: -320,
-                          behavior: "smooth",
-                        })
-                      }
-                      sx={{
-                        border: `1px solid ${ui.border}`,
-                        bgcolor: "white",
-                        width: 32,
-                        height: 32,
-                      }}
-                    >
-                      <ChevronLeft fontSize="small" />
-                    </IconButton>
-
-                    <IconButton
-                      onClick={() =>
-                        document.getElementById("iter-carousel")?.scrollBy({
-                          left: 320,
-                          behavior: "smooth",
-                        })
-                      }
-                      sx={{
-                        border: `1px solid ${ui.border}`,
-                        bgcolor: "white",
-                        width: 32,
-                        height: 32,
-                      }}
-                    >
-                      <ChevronRight fontSize="small" />
-                    </IconButton>
-                  </Box>
-                )}
-              </Box>
-
-              {iterationHistory?.length === 0 ? (
-                <Paper
-                  sx={{
-                    p: 3,
-                    textAlign: "center",
-                    borderRadius: 3,
-                    border: `1px solid ${ui.border}`,
-                    color: ui.muted,
-                    boxShadow: "none",
-                  }}
-                >
-                  No current iteration history to show
-                </Paper>
-              ) : (
-                <Box
-                  sx={{
-                    width: "100%",
-                    overflow: "hidden",
-                  }}
-                >
-                  <Box
-                    id="iter-carousel"
-                    sx={{
-                      display: "flex",
-                      gap: 2,
-                      overflowX: "auto",
-                      scrollBehavior: "smooth",
-                      "&::-webkit-scrollbar": { display: "none" },
-                    }}
-                  >
-                    {iterationHistory?.map((item, i) => (
-                      <Paper
-                        key={i}
+                    <FormControl size="small">
+                      <InputLabel>Select Space</InputLabel>
+                      <Select
+                        value={activeSpace}
+                        label="Select Space"
+                        onChange={(e) => setActiveSpace(e.target.value)}
                         sx={{
-                          minWidth: "23%",
-                          maxWidth: "23%",
-                          height: 200,
-                          borderRadius: 3,
-                          border: `1px solid ${ui.border}`,
-                          overflow: "hidden",
-                          position: "relative",
+                          minWidth: { xs: 150, sm: 200 },
                           bgcolor: "white",
-                          display: "flex",
+                          borderRadius: 2,
                         }}
                       >
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            top: 8,
-                            left: 8,
-                            bgcolor: ui.primary,
-                            color: "white",
-                            px: 1,
-                            py: 0.3,
-                            borderRadius: 1,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            zIndex: 2,
-                          }}
-                        >
-                          {item.v}
-                        </Box>
+                        {spaces.map((space) => (
+                          <MenuItem key={space} value={space}>
+                            {space}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
 
+                  {/* BASELINE CARD */}
+                  <Card
+                    onClick={() =>
+                      toggleBaselineSelect(spaceImages[currentIndex]?.id)
+                    }
+                    sx={{
+                      borderRadius: ui.cardRadius,
+                      width: "100%",
+                      position: "relative",
+                      maxWidth: 420,
+                      aspectRatio: "4 / 3",
+                      overflow: "hidden",
+                      backgroundColor: "white",
+                      border: selectedBaselineIds?.includes(
+                        spaceImages[currentIndex]?.id,
+                      )
+                        ? `3px solid ${ui.blue}`
+                        : `1px solid ${ui.border}`,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {spaceImages?.length > 0 ? (
+                      <>
                         <CardMedia
                           component="img"
-                          image={item.url}
+                          image={spaceImages[currentIndex]?.url}
                           sx={{
                             width: "100%",
                             height: "100%",
                             objectFit: "cover",
+                            borderRadius: ui.cardRadius,
                           }}
                         />
-                      </Paper>
-                    ))}
-                  </Box>
-                </Box>
-              )}
-            </Box>
+                        {selectedBaselineIds?.includes(
+                          spaceImages[currentIndex]?.id,
+                        ) && (
+                          <Check
+                            sx={{
+                              position: "absolute",
+                              top: 12,
+                              right: 12,
+                              bgcolor: ui.blue,
+                              color: "white",
+                              borderRadius: "50%",
+                              p: 0.6,
+                            }}
+                          />
+                        )}
 
-            {/* ================= MARKET COMPS CAROUSEL ================= */}
+                        {spaceImages?.length > 1 && (
+                          <>
+                            <IconButton
+                              onClick={(e) => handlePrev(e)}
+                              sx={{
+                                position: "absolute",
+                                left: 16,
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                bgcolor: "white",
+                                boxShadow: 2,
+                              }}
+                            >
+                              <ChevronLeft />
+                            </IconButton>
 
-            {selectedImages?.length ? (
+                            <IconButton
+                              onClick={(e) => handleNext(e)}
+                              sx={{
+                                position: "absolute",
+                                right: 16,
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                bgcolor: "white",
+                                boxShadow: 2,
+                              }}
+                            >
+                              <ChevronRight />
+                            </IconButton>
+                          </>
+                        )}
+
+                        <Chip
+                          label={`${currentIndex + 1} / ${spaceImages?.length}`}
+                          sx={{
+                            position: "absolute",
+                            bottom: 16,
+                            right: 16,
+                            bgcolor: "rgba(255,255,255,0.8)",
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <Box
+                        sx={{
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: ui.muted,
+                        }}
+                      >
+                        No images for {activeSpace}
+                      </Box>
+                    )}
+                  </Card>
+                </Grid>
+
+                {/* ================= CURRENT ITERATION ================= */}
+                {viewMode === "compare" && currentImage && (
+                  <Grid
+                    size={{ xs: 12, md: 6 }}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: "100%",
+                        maxWidth: 420,
+                        mb: 3,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          mt: 1,
+                          fontSize: 16,
+                          letterSpacing: 1,
+                          color: "#2563EB",
+                          textTransform: "uppercase",
+                          fontWeight: 600,
+                          textAlign: "center",
+                        }}
+                      >
+                        CURRENT ITERATION
+                      </Typography>
+                    </Box>
+
+                    <Card
+                      sx={{
+                        width: "100%",
+                        maxWidth: 420,
+                        aspectRatio: "4 / 3",
+                        borderRadius: ui.cardRadius,
+                        overflow: "hidden",
+                        backgroundColor: "white",
+                      }}
+                    >
+                      <CardMedia
+                        component="img"
+                        image={currentImage}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </Card>
+                  </Grid>
+                )}
+              </Grid>
+
               <Box mt={4}>
-                {/* HEADER + NAV BUTTONS */}
                 <Box
                   display="flex"
                   alignItems="center"
                   justifyContent="space-between"
                   mb={2}
                 >
-                  {/* LEFT SIDE — TITLE */}
                   <Box display="flex" alignItems="center" gap={1}>
-                    <CollectionsOutlined
-                      fontSize="small"
-                      sx={{ color: ui.muted }}
-                    />
+                    <History fontSize="small" sx={{ color: ui.muted }} />
                     <Typography
                       fontWeight={600}
                       sx={{ fontSize: 16, letterSpacing: 1 }}
                     >
-                      MARKET COMPS
+                      ITERATION HISTORY
                     </Typography>
                   </Box>
 
-                  {/* RIGHT SIDE — SELECT + ARROWS */}
-                  <Box display="flex" alignItems="center" gap={1.5}>
-                    {/* SELECT */}
-                    <FormControl size="small">
-                      <InputLabel>Select Address</InputLabel>
-                      <Select
-                        value={selectedAddress}
-                        label="Select Address"
-                        onChange={(e) => setSelectedAddress(e.target.value)}
+                  {iterationHistory?.length > 0 && (
+                    <Box display="flex" gap={1}>
+                      <Button
+                        variant="contained"
                         sx={{
-                          minWidth: 260,
+                          bgcolor: "#000",
+                          color: "white",
+                          borderRadius: 3,
+                          textTransform: "none",
+                          px: 2.5,
+                          fontSize: 12,
+                          letterSpacing: 1,
+                        }}
+                        onClick={() => setExportOpen(true)}
+                      >
+                        EXPORT PACKAGE
+                      </Button>
+                      <IconButton
+                        onClick={() =>
+                          document.getElementById("iter-carousel")?.scrollBy({
+                            left: -320,
+                            behavior: "smooth",
+                          })
+                        }
+                        sx={{
+                          border: `1px solid ${ui.border}`,
                           bgcolor: "white",
-                          borderRadius: 2,
+                          width: 32,
+                          height: 32,
                         }}
                       >
-                        {Object.keys(compsImages?.addresses || {}).map(
-                          (addr) => (
-                            <MenuItem key={addr} value={addr}>
-                              {addr}
-                            </MenuItem>
-                          ),
-                        )}
-                      </Select>
-                    </FormControl>
-                  </Box>
+                        <ChevronLeft fontSize="small" />
+                      </IconButton>
+
+                      <IconButton
+                        onClick={() =>
+                          document.getElementById("iter-carousel")?.scrollBy({
+                            left: 320,
+                            behavior: "smooth",
+                          })
+                        }
+                        sx={{
+                          border: `1px solid ${ui.border}`,
+                          bgcolor: "white",
+                          width: 32,
+                          height: 32,
+                        }}
+                      >
+                        <ChevronRight fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  )}
                 </Box>
 
-                {/* WRAPPER CARD */}
-                <Paper
-                  sx={{
-                    borderRadius: 3,
-                    border: `1px solid ${ui.border}`,
-                    overflow: "hidden",
-                    boxShadow: "none",
-                  }}
-                >
-                  <Accordion
-                    expanded={isCompsExpanded}
-                    onChange={(_, expanded) => setIsCompsExpanded(expanded)}
-                    disableGutters
-                    elevation={0}
+                {iterationHistory?.length === 0 ? (
+                  <Paper
+                    sx={{
+                      p: 3,
+                      textAlign: "center",
+                      borderRadius: 3,
+                      border: `1px solid ${ui.border}`,
+                      color: ui.muted,
+                      boxShadow: "none",
+                    }}
                   >
-                    {/* HEADER = SELECTED ADDRESS */}
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        width="100%"
-                      >
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                          <Typography fontWeight={600}>
-                            {selectedAddress}
-                          </Typography>
-
-                          <Chip
-                            label={`${selectedImages.length} Images`}
-                            size="small"
+                    No current iteration history to show
+                  </Paper>
+                ) : (
+                  <Box
+                    sx={{
+                      width: "100%",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Box
+                      id="iter-carousel"
+                      sx={{
+                        display: "flex",
+                        gap: 2,
+                        overflowX: "auto",
+                        scrollBehavior: "smooth",
+                        "&::-webkit-scrollbar": { display: "none" },
+                      }}
+                    >
+                      {iterationHistory?.map((item, i) => (
+                        <Paper
+                          key={i}
+                          sx={{
+                            minWidth: "23%",
+                            maxWidth: "23%",
+                            height: 200,
+                            borderRadius: 3,
+                            border: `1px solid ${ui.border}`,
+                            overflow: "hidden",
+                            position: "relative",
+                            bgcolor: "white",
+                            display: "flex",
+                          }}
+                        >
+                          <Box
                             sx={{
-                              bgcolor: "#EEF2FF",
-                              color: "#000",
+                              position: "absolute",
+                              top: 8,
+                              left: 8,
+                              bgcolor: ui.primary,
+                              color: "white",
+                              px: 1,
+                              py: 0.3,
+                              borderRadius: 1,
                               fontSize: 11,
                               fontWeight: 600,
+                              zIndex: 2,
+                            }}
+                          >
+                            {item.v}
+                          </Box>
+
+                          <CardMedia
+                            component="img"
+                            image={item.url}
+                            sx={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
                             }}
                           />
-                        </Box>
-
-                        <Typography fontSize={12} color={ui.muted}>
-                          {compsImages?.addresses?.[selectedAddress]?.price ||
-                            ""}{" "}
-                          {compsImages?.addresses?.[selectedAddress]?.style
-                            ? `• ${compsImages.addresses[selectedAddress].style}`
-                            : ""}
-                        </Typography>
-                      </Box>
-                    </AccordionSummary>
-
-                    <AccordionDetails sx={{ pt: 0 }}>
-                      {/* ================= SINGLE ROW ================= */}
-                      {compsViewMode === "singleRow" && (
-                        <>
-                          <Box
-                            sx={{
-                              maxHeight: 150,
-                              overflow: "hidden",
-                              display: "grid",
-                              gridTemplateColumns: {
-                                xs: "repeat(2, 1fr)",
-                                sm: "repeat(3, 1fr)",
-                                md: "repeat(4, 1fr)",
-                                lg: "repeat(5, 1fr)",
-                              },
-                              gap: 2,
-                            }}
-                          >
-                            {selectedImages.map((img: any) => {
-                              const selected = selectedCompsIds.includes(
-                                img.id,
-                              );
-
-                              return (
-                                <Card
-                                  key={img.id}
-                                  onClick={() => toggleCompsSelect(img.id)}
-                                  sx={{
-                                    height: 150,
-                                    borderRadius: 2,
-                                    overflow: "hidden",
-                                    position: "relative",
-                                    cursor: "pointer",
-                                    border: selected
-                                      ? `3px solid ${ui.blue}`
-                                      : `1px solid ${ui.border}`,
-                                  }}
-                                >
-                                  <CardMedia
-                                    component="img"
-                                    image={img.url}
-                                    sx={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                    }}
-                                  />
-                                  {selected && (
-                                    <Check
-                                      sx={{
-                                        position: "absolute",
-                                        top: 6,
-                                        right: 6,
-                                        bgcolor: ui.blue,
-                                        color: "white",
-                                        borderRadius: "50%",
-                                        p: 0.4,
-                                      }}
-                                    />
-                                  )}
-                                </Card>
-                              );
-                            })}
-                          </Box>
-
-                          {selectedImages.length > 5 &&
-                            compsViewMode === "singleRow" && (
-                              <Button
-                                size="small"
-                                sx={{ mt: 1, textTransform: "none" }}
-                                onClick={() => setCompsViewMode("scroll")}
-                                color="inherit"
-                              >
-                                Load More
-                              </Button>
-                            )}
-                        </>
-                      )}
-
-                      {/* ================= SCROLL MODE — VERTICAL GRID ================= */}
-                      {compsViewMode === "scroll" && (
-                        <>
-                          <Box
-                            sx={{
-                              maxHeight: 320,
-                              overflowY: "auto",
-                              pr: 1,
-                              display: "grid",
-                              gridTemplateColumns: {
-                                xs: "repeat(2, 1fr)",
-                                sm: "repeat(3, 1fr)",
-                                md: "repeat(4, 1fr)",
-                                lg: "repeat(5, 1fr)",
-                              },
-                              gap: 2,
-                              "&::-webkit-scrollbar": { width: 6 },
-                              "&::-webkit-scrollbar-thumb": {
-                                backgroundColor: "#D1D5DB",
-                                borderRadius: 3,
-                              },
-                            }}
-                          >
-                            {selectedImages.map((img: any) => {
-                              const selected = selectedCompsIds.includes(
-                                img.id,
-                              );
-
-                              return (
-                                <Card
-                                  key={img.id}
-                                  onClick={() => toggleCompsSelect(img.id)}
-                                  sx={{
-                                    height: 150,
-                                    borderRadius: 2,
-                                    overflow: "hidden",
-                                    position: "relative",
-                                    cursor: "pointer",
-                                    border: selected
-                                      ? `3px solid ${ui.blue}`
-                                      : `1px solid ${ui.border}`,
-                                  }}
-                                >
-                                  <CardMedia
-                                    component="img"
-                                    image={img.url}
-                                    sx={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                    }}
-                                  />
-
-                                  {selected && (
-                                    <Check
-                                      sx={{
-                                        position: "absolute",
-                                        top: 6,
-                                        right: 6,
-                                        bgcolor: ui.blue,
-                                        color: "white",
-                                        borderRadius: "50%",
-                                        p: 0.4,
-                                      }}
-                                    />
-                                  )}
-                                </Card>
-                              );
-                            })}
-                          </Box>
-                          {compsViewMode === "scroll" &&
-                            selectedImages.length > 5 && (
-                              <Button
-                                size="small"
-                                sx={{ mt: 1, textTransform: "none" }}
-                                onClick={() => setCompsViewMode("singleRow")}
-                                color="inherit"
-                              >
-                                View Less
-                              </Button>
-                            )}
-                        </>
-                      )}
-                    </AccordionDetails>
-                  </Accordion>
-                </Paper>
+                        </Paper>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
               </Box>
-            ) : null}
+
+              {/* ================= MARKET COMPS CAROUSEL ================= */}
+              {selectedImages?.length ? (
+                <Box mt={4}>
+                  {/* HEADER + NAV BUTTONS */}
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    mb={2}
+                  >
+                    {/* LEFT SIDE — TITLE */}
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <CollectionsOutlined
+                        fontSize="small"
+                        sx={{ color: ui.muted }}
+                      />
+                      <Typography
+                        fontWeight={600}
+                        sx={{ fontSize: 16, letterSpacing: 1 }}
+                      >
+                        MARKET COMPS
+                      </Typography>
+                    </Box>
+
+                    {/* RIGHT SIDE — SELECT + ARROWS */}
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                      {/* SELECT */}
+                      <FormControl size="small">
+                        <InputLabel>Select Address</InputLabel>
+                        <Select
+                          value={selectedAddress}
+                          label="Select Address"
+                          onChange={(e) => setSelectedAddress(e.target.value)}
+                          sx={{
+                            minWidth: 260,
+                            bgcolor: "white",
+                            borderRadius: 2,
+                          }}
+                        >
+                          {Object.keys(compsImages?.addresses || {}).map(
+                            (addr) => (
+                              <MenuItem key={addr} value={addr}>
+                                {addr}
+                              </MenuItem>
+                            ),
+                          )}
+                        </Select>
+                      </FormControl>
+                    </Box>
+                  </Box>
+
+                  {/* WRAPPER CARD */}
+                  <Paper
+                    sx={{
+                      borderRadius: 3,
+                      border: `1px solid ${ui.border}`,
+                      overflow: "hidden",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <Accordion
+                      expanded={isCompsExpanded}
+                      onChange={(_, expanded) => setIsCompsExpanded(expanded)}
+                      disableGutters
+                      elevation={0}
+                    >
+                      {/* HEADER = SELECTED ADDRESS */}
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          width="100%"
+                        >
+                          <Box display="flex" alignItems="center" gap={1.5}>
+                            <Typography fontWeight={600}>
+                              {selectedAddress}
+                            </Typography>
+
+                            <Chip
+                              label={`${selectedImages.length} Images`}
+                              size="small"
+                              sx={{
+                                bgcolor: "#EEF2FF",
+                                color: "#000",
+                                fontSize: 11,
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Box>
+
+                          <Typography fontSize={12} color={ui.muted}>
+                            {compsImages?.addresses?.[selectedAddress]?.price ||
+                              ""}{" "}
+                            {compsImages?.addresses?.[selectedAddress]?.style
+                              ? `• ${compsImages.addresses[selectedAddress].style}`
+                              : ""}
+                          </Typography>
+                        </Box>
+                      </AccordionSummary>
+
+                      <AccordionDetails sx={{ pt: 0 }}>
+                        <Box
+                          sx={{
+                            pr: 1,
+                            display: "grid",
+                            gridTemplateColumns: {
+                              xs: "repeat(2, 1fr)",
+                              sm: "repeat(3, 1fr)",
+                              md: "repeat(4, 1fr)",
+                              lg: "repeat(5, 1fr)",
+                            },
+                            gap: 2,
+                            "&::-webkit-scrollbar": { width: 6 },
+                            "&::-webkit-scrollbar-thumb": {
+                              backgroundColor: "#D1D5DB",
+                              borderRadius: 3,
+                            },
+                          }}
+                        >
+                          {selectedImages.map((img: any) => {
+                            const selected = selectedCompsIds.includes(img?.id);
+
+                            return (
+                              <Card
+                                key={img.id}
+                                onClick={() => toggleCompsSelect(img?.id)}
+                                sx={{
+                                  height: 170,
+                                  borderRadius: 2,
+                                  overflow: "hidden",
+                                  position: "relative",
+                                  cursor: "pointer",
+                                  border: selected
+                                    ? `3px solid ${ui.blue}`
+                                    : `1px solid ${ui.border}`,
+                                }}
+                              >
+                                <CardMedia
+                                  component="img"
+                                  image={img.url}
+                                  sx={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                  }}
+                                />
+                                {selected && (
+                                  <Check
+                                    sx={{
+                                      position: "absolute",
+                                      top: 6,
+                                      right: 6,
+                                      bgcolor: ui.blue,
+                                      color: "white",
+                                      borderRadius: "50%",
+                                      p: 0.4,
+                                    }}
+                                  />
+                                )}
+                              </Card>
+                            );
+                          })}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  </Paper>
+                </Box>
+              ) : null}
+            </Box>
           </Box>
           {/* ========== RIGHT CHAT PANEL ========== */}
           <Box
             mt={{ xs: 4, md: 0 }}
             display="flex"
             flexDirection="column"
-            flex={1}
-            minWidth={0}
-            height={
-              iterationHistory?.length > 0 ? "100vh" : "calc(100vh - 70px)"
-            }
+            flexShrink={0}
+            width={{ xs: "100%", md: 440 }}
+            minWidth={{ xs: "100%", md: 420 }}
+            minHeight={0}
+            height="100%"
+            overflow="hidden"
           >
             <Paper
               sx={{
@@ -1346,6 +1256,8 @@ export default function DesignWorkspacePage() {
                 bgcolor: "#FFFFFF",
                 flex: 1,
                 minHeight: 0,
+                height: "100%",
+                overflow: "hidden",
               }}
             >
               {/* HEADER */}
@@ -1369,7 +1281,6 @@ export default function DesignWorkspacePage() {
                 sx={{
                   overflowY: "auto",
                   pr: 0.5,
-                  height: "100%",
                   "&::-webkit-scrollbar": { display: "none" },
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
@@ -1455,7 +1366,7 @@ export default function DesignWorkspacePage() {
                           </Box>
                         )}
 
-                        <Typography color="#000"> {msg?.text}</Typography>
+                        <Typography color="#000">{msg?.text}</Typography>
                       </Paper>
                     </Box>
                   ) : (
@@ -1609,8 +1520,8 @@ export default function DesignWorkspacePage() {
                         key={img.id}
                         sx={{
                           position: "relative",
-                          width: 80,
-                          height: 80,
+                          width: 60,
+                          height: 60,
                           borderRadius: 2,
                           overflow: "hidden",
                           border: `1px solid ${ui.border}`,

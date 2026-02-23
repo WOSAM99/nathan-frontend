@@ -69,8 +69,8 @@ export default function AuthPage() {
   );
 
   const methods = useForm<FormValues>({
-    mode: "onBlur",
-    reValidateMode: "onBlur",
+    mode: "onChange",
+    reValidateMode: "onChange",
     resolver: yupResolver(formValidation),
     defaultValues,
   });

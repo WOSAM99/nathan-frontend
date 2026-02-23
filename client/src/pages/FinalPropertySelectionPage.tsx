@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -11,26 +11,54 @@ import {
 } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-
-const rooms = [
-  {
-    id: "01",
-    name: "Chef's Kitchen",
-    img: "https://picsum.photos/1400/800?1",
-  },
-  {
-    id: "02",
-    name: "Living Area",
-    img: "https://picsum.photos/1400/800?2",
-  },
-  {
-    id: "03",
-    name: "Primary Suite",
-    img: "https://picsum.photos/1400/800?3",
-  },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { useRoute } from "wouter";
+import { useAppSnackbar } from "@/hooks/useAppSnackbar";
+import { api } from "@/lib/api";
 
 export default function FinalPropertySelection() {
+  const { userId } = useAuth();
+  const [, params] = useRoute("/property-selection/:id");
+  const propertyId = params?.id || "";
+
+  const { showSnackbar } = useAppSnackbar();
+
+  const [finalImages, setFinalImages] = useState<
+    { url: string; category: string }[]
+  >([]);
+
+  const rooms = useMemo(() => {
+    const map: Record<string, { id: string; name: string; img: string }> = {};
+
+    finalImages.forEach((img) => {
+      if (!map[img.category]) {
+        map[img.category] = {
+          id: String(Object.keys(map).length + 1).padStart(2, "0"),
+          name: img.category,
+          img: img.url,
+        };
+      }
+    });
+
+    return Object.values(map);
+  }, [finalImages]);
+
+  useEffect(() => {
+    if (!propertyId || !userId) return;
+
+    const loadFinalImages = async () => {
+      try {
+        const res = await api.getFinalImages(propertyId, String(userId));
+        setFinalImages(res?.images || []);
+      } catch {
+        showSnackbar("Failed to load final images", "error");
+      }
+    };
+
+    loadFinalImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyId, userId]);
+
   return (
     <Box sx={{ background: "#f6f7f9", minHeight: "100vh", py: 6 }}>
       <Container maxWidth="md">
@@ -60,43 +88,49 @@ export default function FinalPropertySelection() {
 
         {/* ROOMS */}
         <Stack spacing={5}>
-          {rooms.map((room) => (
-            <Box key={room.id}>
-              <Stack direction="row" spacing={1} mb={1} alignItems="center">
-                <Typography
-                  fontSize={12}
-                  fontWeight={700}
-                  color="#2563eb"
-                  sx={{ letterSpacing: 1 }}
-                >
-                  ROOM {room.id}
-                </Typography>
+          {rooms.length === 0 ? (
+            <Typography textAlign="center" color="#6b7280">
+              No final images available
+            </Typography>
+          ) : (
+            rooms.map((room) => (
+              <Box key={room.id}>
+                <Stack direction="row" spacing={1} mb={1} alignItems="center">
+                  <Typography
+                    fontSize={14}
+                    fontWeight={700}
+                    color="#6b7280"
+                    sx={{ letterSpacing: 1 }}
+                  >
+                    {room.id}
+                  </Typography>
 
-                <Typography fontSize={15} fontWeight={500} color="#111827">
-                  {room.name}
-                </Typography>
-              </Stack>
+                  <Typography fontSize={16} fontWeight={500} color="#111827">
+                    {room.name}
+                  </Typography>
+                </Stack>
 
-              <Card
-                elevation={0}
-                sx={{
-                  borderRadius: 4,
-                  overflow: "hidden",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
-                }}
-              >
-                <CardMedia
-                  component="img"
-                  image={room.img}
-                  alt={room.name}
+                <Card
+                  elevation={0}
                   sx={{
-                    height: 360,
-                    objectFit: "cover",
+                    borderRadius: 4,
+                    overflow: "hidden",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
                   }}
-                />
-              </Card>
-            </Box>
-          ))}
+                >
+                  <CardMedia
+                    component="img"
+                    image={room.img}
+                    alt={room.name}
+                    sx={{
+                      height: 360,
+                      objectFit: "cover",
+                    }}
+                  />
+                </Card>
+              </Box>
+            ))
+          )}
         </Stack>
 
         {/* COMPLETION CARD */}

@@ -26,9 +26,9 @@ import { api } from "@/lib/api";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import AppNavbar from "@/components/AppNavBar";
 import { useAuth } from "@/contexts/AuthContext";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ConfirmModal from "@/components/ConfirmModal";
 import { DeleteTarget, Photo } from "@/types";
-import RenameCategoryDialog from "@/components/RenameCategoryDialog";
+import RenameCategoryModal from "@/components/RenameCategoryModal";
 import AddCategoryModal from "@/components/AddCategoryModal";
 import Add from "@mui/icons-material/Add";
 
@@ -58,7 +58,7 @@ export default function PhotoSelectionPage() {
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   const [categories, setCategories] = useState<string[]>([]);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameCategoryName, setRenameCategoryName] = useState<string>("");
   const [renameLoading, setRenameLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
@@ -213,7 +213,7 @@ export default function PhotoSelectionPage() {
   const renameCategory = useCallback(
     async (oldName: string, newName: string) => {
       if (!newName || oldName === newName) {
-        setRenameDialogOpen(false);
+        setRenameModalOpen(false);
         return;
       }
 
@@ -243,7 +243,7 @@ export default function PhotoSelectionPage() {
         loadPropertyImages();
       } finally {
         setRenameLoading(false);
-        setRenameDialogOpen(false);
+        setRenameModalOpen(false);
       }
     },
     [propertyId, userId, selectedCategory, showSnackbar, loadPropertyImages],
@@ -411,7 +411,7 @@ export default function PhotoSelectionPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setRenameCategoryName(cat.label);
-                        setRenameDialogOpen(true);
+                        setRenameModalOpen(true);
                       }}
                       sx={{
                         color:
@@ -579,6 +579,11 @@ export default function PhotoSelectionPage() {
           anchorEl={menuAnchor}
           open={Boolean(menuAnchor)}
           onClose={() => setMenuAnchor(null)}
+          MenuListProps={{
+            sx: {
+              py: 0,
+            },
+          }}
         >
           <Box
             onClick={() => setAddCategoryOpen(true)}
@@ -590,12 +595,18 @@ export default function PhotoSelectionPage() {
               py: 1,
               borderRadius: 1,
               cursor: "pointer",
-
+              background: "#f3f3f3",
               "&:hover": { bgcolor: "#f3f3f3" },
             }}
           >
             <Add fontSize="small" />
-            <Typography fontSize={14}>Add New Category</Typography>
+            <Typography
+              fontSize={14}
+              fontWeight={600}
+              sx={{ letterSpacing: 1 }}
+            >
+              Add New Category
+            </Typography>
           </Box>
           <Divider />
           {dynamicCategories
@@ -647,7 +658,7 @@ export default function PhotoSelectionPage() {
         </Box>
       </Box>
 
-      <ConfirmDialog
+      <ConfirmModal
         open={Boolean(deleteTarget)}
         title={
           deleteTarget?.type === "category" ? "Delete Category" : "Delete Image"
@@ -659,16 +670,16 @@ export default function PhotoSelectionPage() {
         }
         onConfirm={deletePhotoFn}
         onCancel={() => setDeleteTarget(null)}
-        confirmText="Yes, Delete"
+        confirmText="Delete"
         cancelText="Cancel"
         loading={deleteLoading}
       />
 
-      <RenameCategoryDialog
-        open={renameDialogOpen}
+      <RenameCategoryModal
+        open={renameModalOpen}
         initialValue={renameCategoryName}
         loading={renameLoading}
-        onCancel={() => setRenameDialogOpen(false)}
+        onCancel={() => setRenameModalOpen(false)}
         onConfirm={(newName) => renameCategory(renameCategoryName, newName)}
       />
 

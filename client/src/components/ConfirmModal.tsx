@@ -1,4 +1,4 @@
-import { ConfirmDialogProps } from "@/types";
+import { ConfirmModalProps } from "@/types";
 import {
   Dialog,
   DialogTitle,
@@ -8,7 +8,7 @@ import {
   Button,
 } from "@mui/material";
 
-export default function ConfirmDialog({
+export default function ConfirmModal({
   open,
   title = "Confirm Action",
   description = "Are you sure you want to proceed?",
@@ -17,7 +17,7 @@ export default function ConfirmDialog({
   confirmText = "Yes",
   cancelText = "Cancel",
   loading = false,
-}: ConfirmDialogProps) {
+}: ConfirmModalProps) {
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ fontWeight: 600 }}>{title}</DialogTitle>

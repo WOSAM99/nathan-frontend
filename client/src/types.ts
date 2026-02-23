@@ -114,7 +114,7 @@ export interface AppNavbarProps {
   bgcolor?: string;
 }
 
-export interface ConfirmDialogProps {
+export interface ConfirmModalProps {
   open: boolean;
   title?: string;
   description?: string;
@@ -161,3 +161,23 @@ export type ChatMessage = {
   text: string;
   images?: { url: string }[];
 };
+
+export interface RenameCategoryModalProps {
+  open: boolean;
+  initialValue: string;
+  loading?: boolean;
+  onConfirm: (newName: string) => void;
+  onCancel: () => void;
+}
+
+export interface AddCategoryModalProps {
+  open: boolean;
+  onClose: () => void;
+  propertyId: string;
+  userId: string;
+  onSuccess?: () => void;
+}
+
+export interface CategoryFormValues {
+  categoryName: string;
+}

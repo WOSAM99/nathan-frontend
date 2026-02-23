@@ -46,26 +46,7 @@ export default function DashboardPage() {
 
   return (
     <Box>
-      <AppNavbar
-        showNewProject={true}
-        centerContent={
-          <Tabs
-            value={tab}
-            onChange={(_, v) => setTab(v)}
-            sx={{
-              "& .MuiTab-root": {
-                textTransform: "uppercase",
-                letterSpacing: 1,
-                fontSize: 12,
-              },
-            }}
-          >
-            <Tab label="MY PROJECTS" />
-            <Tab label="ASSETS" />
-            <Tab label="TEMPLATES" />
-          </Tabs>
-        }
-      />
+      <AppNavbar showNewProject={true} />
 
       {/* ===== TITLE + SEARCH ===== */}
       <Box
@@ -130,6 +111,8 @@ export default function DashboardPage() {
                     ).flatMap((cat: any) => cat?.images || [])?.[0]?.url
                   }
                   sx={{
+                    width: "100%",
+                    aspectRatio: "4 / 3",
                     objectFit: "cover",
                   }}
                 />

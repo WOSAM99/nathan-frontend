@@ -310,16 +310,35 @@ class ApiClient {
   async getImageUrl(
     property_id: string,
     user_id: string,
-    image: string,
-  ): Promise<any> {
-    return this.request(`chat/image/url`, {
-      method: "DELETE",
-      body: JSON.stringify({
-        property_id,
-        user_id,
-        image,
-      }),
+    file: File,
+  ): Promise<{ url: string }> {
+    this.accessToken = localStorage.getItem("access_token");
+
+    const formData = new FormData();
+    formData.append("property_id", property_id);
+    if (user_id) formData.append("user_id", user_id);
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE_URL}/chat/image/url`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      credentials: "include",
+      body: formData,
     });
+
+    if (!response.ok) {
+      let message = "Image upload failed";
+      try {
+        const err = await response.json();
+        message = err.message || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    const json = await response.json();
+    return this.unwrapResponse<{ url: string }>(json);
   }
 
   async storeIterationImages(body: {
@@ -348,16 +367,46 @@ class ApiClient {
     });
   }
 
-  async addCategoryJson(body: {
-    property_id: string;
-    user_id: string;
-    category: string;
-    image?: string;
-  }): Promise<any> {
-    return this.request(`/doc/add/category`, {
+  async addCategory(formData: FormData): Promise<any> {
+    // Always get fresh token
+    this.accessToken = localStorage.getItem("access_token");
+
+    const response = await fetch(`${API_BASE_URL}/doc/add/category`, {
       method: "POST",
-      body: JSON.stringify(body),
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      credentials: "include",
+      body: formData,
     });
+
+    if (!response.ok) {
+      let message = "Failed to add category";
+
+      try {
+        const error = await response.json();
+        message = error.message || message;
+      } catch {}
+
+      throw new Error(message);
+    }
+
+    const json = await response.json();
+    return this.unwrapResponse<any>(json);
+  }
+
+  async getFinalImages(
+    property_id: string,
+    user_id: string,
+  ): Promise<{
+    images: { url: string; category: string; description?: string }[];
+  }> {
+    return this.request(
+      `/chat/finalproperty?property_id=${property_id}&user_id=${user_id}`,
+      {
+        method: "GET",
+      },
+    );
   }
 }
 
