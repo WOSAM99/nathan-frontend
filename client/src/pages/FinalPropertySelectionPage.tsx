@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -8,6 +8,8 @@ import {
   Button,
   Stack,
   Paper,
+  Chip,
+  IconButton,
 } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
@@ -15,6 +17,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRoute } from "wouter";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 import { api } from "@/lib/api";
+import ChevronLeft from "@mui/icons-material/ChevronLeft";
+import ChevronRight from "@mui/icons-material/ChevronRight";
 
 export default function FinalPropertySelection() {
   const { userId } = useAuth();
@@ -26,22 +30,51 @@ export default function FinalPropertySelection() {
   const [finalImages, setFinalImages] = useState<
     { url: string; category: string }[]
   >([]);
+  const [roomIndexes, setRoomIndexes] = useState<Record<string, number>>({});
 
   const rooms = useMemo(() => {
-    const map: Record<string, { id: string; name: string; img: string }> = {};
+    const map: Record<string, { id: string; name: string; images: string[] }> =
+      {};
 
     finalImages.forEach((img) => {
       if (!map[img.category]) {
         map[img.category] = {
           id: String(Object.keys(map).length + 1).padStart(2, "0"),
           name: img.category,
-          img: img.url,
+          images: [],
         };
       }
+
+      map[img.category].images.push(img.url);
     });
 
     return Object.values(map);
   }, [finalImages]);
+
+  const getIndex = useCallback(
+    (roomName: string) => roomIndexes[roomName] || 0,
+    [roomIndexes],
+  );
+
+  const handleNext = useCallback(
+    (roomName: string, total: number) => {
+      setRoomIndexes((prev) => ({
+        ...prev,
+        [roomName]: (getIndex(roomName) + 1) % total,
+      }));
+    },
+    [getIndex],
+  );
+
+  const handlePrev = useCallback(
+    (roomName: string, total: number) => {
+      setRoomIndexes((prev) => ({
+        ...prev,
+        [roomName]: (getIndex(roomName) - 1 + total) % total,
+      }));
+    },
+    [getIndex],
+  );
 
   useEffect(() => {
     if (!propertyId || !userId) return;
@@ -116,17 +149,64 @@ export default function FinalPropertySelection() {
                     borderRadius: 4,
                     overflow: "hidden",
                     boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
+                    position: "relative",
                   }}
                 >
                   <CardMedia
                     component="img"
-                    image={room.img}
+                    image={room.images[getIndex(room.name)]}
                     alt={room.name}
                     sx={{
                       height: 360,
                       objectFit: "cover",
                     }}
                   />
+                  {room.images.length > 1 && (
+                    <>
+                      <IconButton
+                        onClick={() =>
+                          handlePrev(room.name, room.images.length)
+                        }
+                        sx={{
+                          position: "absolute",
+                          left: 16,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          bgcolor: "white",
+                          boxShadow: 2,
+                        }}
+                      >
+                        <ChevronLeft />
+                      </IconButton>
+
+                      <IconButton
+                        onClick={() =>
+                          handleNext(room.name, room.images.length)
+                        }
+                        sx={{
+                          position: "absolute",
+                          right: 16,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          bgcolor: "white",
+                          boxShadow: 2,
+                        }}
+                      >
+                        <ChevronRight />
+                      </IconButton>
+
+                      {/* COUNTER */}
+                      <Chip
+                        label={`${getIndex(room.name) + 1} / ${room.images.length}`}
+                        sx={{
+                          position: "absolute",
+                          bottom: 16,
+                          right: 16,
+                          bgcolor: "rgba(255,255,255,0.8)",
+                        }}
+                      />
+                    </>
+                  )}
                 </Card>
               </Box>
             ))

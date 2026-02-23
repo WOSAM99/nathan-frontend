@@ -30,10 +30,13 @@ import Check from "@mui/icons-material/Check";
 import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import CollectionsOutlined from "@mui/icons-material/CollectionsOutlined";
 import History from "@mui/icons-material/History";
-import { ChatMessage, PropertyDetails } from "@/types";
+import { ChatMessage, IterationItem, PropertyDetails } from "@/types";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FinalSelectionModal from "@/components/FinalSelectionModal";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import Tooltip from "@mui/material/Tooltip";
+import ConfirmModal from "@/components/ConfirmModal";
 
 /* ================= DESIGN TOKENS ================= */
 const ui = {
@@ -84,10 +87,7 @@ export default function DesignWorkspacePage() {
   const [selectedCompsIds, setSelectedCompsIds] = useState<string[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [iterationHistory, setIterationHistory] = useState<
-    { v: string; url: string; description: string; category: string }[]
-  >([]);
-  const [versionCounter, setVersionCounter] = useState<number>(1.1);
+  const [iterationHistory, setIterationHistory] = useState<IterationItem[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<string>("");
   const [pastedImages, setPastedImages] = useState<
     { file: File; preview: string }[]
@@ -96,12 +96,14 @@ export default function DesignWorkspacePage() {
     url: string;
     description: string;
   } | null>(null);
-  const [isCompsExpanded, setIsCompsExpanded] = useState(true);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [isCompsExpanded, setIsCompsExpanded] = useState<boolean>(true);
+  const [exportOpen, setExportOpen] = useState<boolean>(false);
   const [exportSelections, setExportSelections] = useState<
     Record<string, { v: string; url: string; description: string }[]>
   >({});
   const [pastedImageUrls, setPastedImageUrls] = useState<string[]>([]);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
 
   const propertyId = useMemo(() => params?.id || "", [params?.id]);
 
@@ -149,6 +151,59 @@ export default function DesignWorkspacePage() {
     return map;
   }, [iterationHistory]);
 
+  const handleSwapWithCurrent = (item: any) => {
+    setCurrentImage(item.url);
+  };
+
+  const saveIterationToHistory = useCallback(
+    (image: { url: string; description: string }) => {
+      const tempId = crypto.randomUUID();
+
+      setIterationHistory((prev) => [
+        {
+          id: tempId,
+          url: image?.url,
+          description: image?.description,
+          category: activeSpace,
+        },
+        ...prev,
+      ]);
+    },
+    [activeSpace],
+  );
+
+  const confirmDeleteIteration = async () => {
+    if (!deleteTargetId) return;
+
+    setDeleteLoading(true);
+
+    try {
+      await api.deleteIterationImages(
+        propertyId,
+        [deleteTargetId],
+        String(userId),
+      );
+
+      setIterationHistory((prev) =>
+        prev.filter((item) => item.id !== deleteTargetId),
+      );
+
+      if (
+        currentImage ===
+        iterationHistory.find((i) => i.id === deleteTargetId)?.url
+      ) {
+        setCurrentImage(null);
+      }
+
+      showSnackbar("Iteration image deleted", "success");
+    } catch {
+      showSnackbar("Failed to delete iteration image", "error");
+    } finally {
+      setDeleteLoading(false);
+      setDeleteTargetId(null);
+    }
+  };
+
   const handleRemoveSelected = useCallback(
     (img: any) => {
       if (img.type === "baseline") {
@@ -190,10 +245,6 @@ export default function DesignWorkspacePage() {
     },
     [],
   );
-
-  const scrollToBottom = useCallback(() => {
-    chatEndRef?.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
 
   const handleNext = useCallback(
     (e: any) => {
@@ -335,81 +386,94 @@ export default function DesignWorkspacePage() {
     selectedAddress,
   ]);
 
-  const handleAcceptGenerated = useCallback(async () => {
+  const handleAcceptGenerated = useCallback(() => {
     if (!pendingImage) return;
 
-    const newVersion = `v${versionCounter.toFixed(1)}`;
+    saveIterationToHistory(pendingImage);
 
-    try {
-      await api.storeIterationImages({
-        property_id: propertyId,
-        user_id: String(userId),
-        images: pendingImage.url,
-      });
+    // set as current
+    setCurrentImage(pendingImage.url);
 
-      // set current image
-      setCurrentImage(pendingImage.url);
-
-      // push into history
-      setIterationHistory((prev) => [
-        {
-          v: newVersion,
-          url: pendingImage.url,
-          description: pendingImage.description,
-          category: activeSpace,
-        },
-        ...prev,
-      ]);
-
-      // increment version
-      setVersionCounter((v) => v + 0.1);
-
-      // add chat message
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "ai",
-          text: "Added to timeline.",
-          images: [{ url: pendingImage.url }],
-        },
-      ]);
-
-      setPendingImage(null);
-
-      showSnackbar("Iteration saved", "success");
-    } catch (err) {
-      showSnackbar("Failed to save iteration", "error");
-    }
-  }, [
-    pendingImage,
-    versionCounter,
-    propertyId,
-    userId,
-    activeSpace,
-    showSnackbar,
-  ]);
-
-  const handleRejectGenerated = useCallback(() => {
-    if (!pendingImage) return;
-
-    // Keep image in chat (but not in history/current)
     setMessages((prev) => [
       ...prev,
       {
         sender: "ai",
-        text: "Okay, not added to timeline.",
+        text: "Added to timeline.",
         images: [{ url: pendingImage.url }],
       },
     ]);
 
     setPendingImage(null);
-  }, [pendingImage]);
+  }, [pendingImage, saveIterationToHistory]);
+
+  const handleRejectGenerated = useCallback(() => {
+    if (!pendingImage) return;
+
+    saveIterationToHistory(pendingImage);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: "ai",
+        text: "Saved to history.",
+        images: [{ url: pendingImage.url }],
+      },
+    ]);
+
+    setPendingImage(null);
+  }, [pendingImage, saveIterationToHistory]);
+
+  const chatHistory = useCallback((chatHistory: any[]): ChatMessage[] => {
+    if (!chatHistory?.length) return [];
+
+    return chatHistory.map(
+      (msg): ChatMessage => ({
+        sender: msg.role === "assistant" ? "ai" : "user",
+
+        text:
+          msg.role === "assistant" ? msg.description || "" : msg.content || "",
+
+        images:
+          msg.images?.length > 0
+            ? msg.images.map((img: any) => ({ url: img.url }))
+            : [],
+      }),
+    );
+  }, []);
+
+  const iterationHistoryData = (apiHistory: any[], defaultCategory: string) => {
+    if (!apiHistory?.length) return [];
+
+    return apiHistory
+      .slice()
+      .reverse()
+      .map((item, index) => ({
+        id: item.id,
+        v: `v${(apiHistory.length - index).toFixed(1)}`,
+        url: item.url,
+        description: "Saved iteration",
+        category: defaultCategory,
+      }));
+  };
+
+  const scrollToBottom = useCallback(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+  }, []);
 
   const loadDetails = useCallback(async () => {
     try {
       const details = await api?.getPropertyDetails(propertyId, String(userId));
 
       setPropertyDetails(details);
+
+      const mappedMessages = chatHistory(details?.chat_history || []);
+      setMessages(mappedMessages);
+      setTimeout(scrollToBottom, 0);
 
       const categoriesObj = details?.files?.mls_images?.categories || {};
 
@@ -473,6 +537,19 @@ export default function DesignWorkspacePage() {
 
       setActiveSpace(firstSpace);
 
+      const apiIterations = details?.iteration_history || [];
+
+      if (apiIterations.length > 0) {
+        const mappedIterations = iterationHistoryData(
+          apiIterations,
+          activeSpace || "General",
+        );
+
+        setIterationHistory(mappedIterations);
+
+        // set latest as current image
+        setCurrentImage(mappedIterations[0]?.url || null);
+      }
       // ---------- STORE COMPS IMAGES ----------
       const comps = details?.files?.comps_images || [];
       setCompsImages(comps);
@@ -482,7 +559,14 @@ export default function DesignWorkspacePage() {
     } catch (err) {
       showSnackbar("Failed to load property details", "error");
     }
-  }, [propertyId, userId, showSnackbar]);
+  }, [
+    propertyId,
+    userId,
+    chatHistory,
+    scrollToBottom,
+    activeSpace,
+    showSnackbar,
+  ]);
 
   const handlePaste = useCallback(
     async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -537,7 +621,7 @@ export default function DesignWorkspacePage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages, pendingImage, isGenerating, scrollToBottom]);
 
   useEffect(() => {
     setCurrentIndex(0);
@@ -669,10 +753,7 @@ export default function DesignWorkspacePage() {
                   },
                 }}
               >
-                <ToggleButton
-                  value="compare"
-                  disabled={iterationHistory?.length === 0}
-                >
+                <ToggleButton value="compare" disabled={!currentImage}>
                   COMPARE
                 </ToggleButton>
                 <ToggleButton value="single">SINGLE</ToggleButton>
@@ -1012,50 +1093,108 @@ export default function DesignWorkspacePage() {
                         "&::-webkit-scrollbar": { display: "none" },
                       }}
                     >
-                      {iterationHistory?.map((item, i) => (
-                        <Paper
-                          key={i}
-                          sx={{
-                            minWidth: "23%",
-                            maxWidth: "23%",
-                            height: 200,
-                            borderRadius: 3,
-                            border: `1px solid ${ui.border}`,
-                            overflow: "hidden",
-                            position: "relative",
-                            bgcolor: "white",
-                            display: "flex",
-                          }}
-                        >
-                          <Box
+                      {iterationHistory?.map((item, i) => {
+                        const isCurrent = item.url === currentImage;
+                        return (
+                          <Paper
+                            key={i}
                             sx={{
-                              position: "absolute",
-                              top: 8,
-                              left: 8,
-                              bgcolor: ui.primary,
-                              color: "white",
-                              px: 1,
-                              py: 0.3,
-                              borderRadius: 1,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              zIndex: 2,
+                              minWidth: "23%",
+                              maxWidth: "23%",
+                              height: 200,
+                              borderRadius: 3,
+                              border: `1px solid ${ui.border}`,
+                              overflow: "hidden",
+                              position: "relative",
+                              bgcolor: "white",
+                              display: "flex",
+                              cursor: "pointer",
+                              "&:hover .swap-btn": { opacity: 1 },
                             }}
                           >
-                            {item.v}
-                          </Box>
+                            <Tooltip
+                              title="Delete"
+                              arrow
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    bgcolor: "#000",
+                                    color: "#fff",
+                                    fontSize: 11,
+                                  },
+                                },
+                                arrow: { sx: { color: "#000" } },
+                              }}
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={() => setDeleteTargetId(item.id)}
+                                sx={{
+                                  position: "absolute",
+                                  top: 6,
+                                  left: 6,
+                                  width: 22,
+                                  height: 22,
+                                  p: 0,
+                                  bgcolor: "rgba(0,0,0,0.55)",
+                                  color: "#fff",
+                                  zIndex: 3,
+                                  "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                                }}
+                              >
+                                <CloseIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Tooltip>
 
-                          <CardMedia
-                            component="img"
-                            image={item.url}
-                            sx={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                            }}
-                          />
-                        </Paper>
-                      ))}
+                            {!isCurrent && (
+                              <Tooltip
+                                title="Swap with current iteration"
+                                arrow
+                                componentsProps={{
+                                  tooltip: {
+                                    sx: {
+                                      bgcolor: "#000",
+                                      color: "#fff",
+                                      fontSize: 12,
+                                    },
+                                  },
+                                  arrow: { sx: { color: "#000" } },
+                                }}
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleSwapWithCurrent(item)}
+                                  sx={{
+                                    position: "absolute",
+                                    top: 6,
+                                    right: 6,
+                                    bgcolor: "rgba(0,0,0,0.6)",
+                                    color: "#fff",
+                                    opacity: 0,
+                                    width: 22,
+                                    height: 22,
+                                    transition: "0.2s",
+                                    zIndex: 3,
+                                    "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                                    ".MuiPaper-root:hover &": { opacity: 1 },
+                                  }}
+                                >
+                                  <SwapHorizIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            <CardMedia
+                              component="img"
+                              image={item.url}
+                              sx={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          </Paper>
+                        );
+                      })}
                     </Box>
                   </Box>
                 )}
@@ -1278,6 +1417,7 @@ export default function DesignWorkspacePage() {
                 display="flex"
                 flexDirection="column"
                 gap={2}
+                minHeight={0}
                 sx={{
                   overflowY: "auto",
                   pr: 0.5,
@@ -1287,7 +1427,6 @@ export default function DesignWorkspacePage() {
                   maxWidth: "100%",
                   minWidth: 0,
                 }}
-                minHeight={0}
               >
                 {messages?.map((msg, index) =>
                   msg?.sender === "ai" ? (
@@ -1329,9 +1468,6 @@ export default function DesignWorkspacePage() {
                           flexDirection: "column",
                           gap: 1,
 
-                          maxHeight: 240,
-                          overflowY: "auto",
-
                           wordBreak: "break-word",
                           whiteSpace: "pre-wrap",
 
@@ -1354,6 +1490,7 @@ export default function DesignWorkspacePage() {
                                 key={i}
                                 component="img"
                                 src={img.url}
+                                onLoad={scrollToBottom}
                                 sx={{
                                   width: 72,
                                   height: 72,
@@ -1450,6 +1587,7 @@ export default function DesignWorkspacePage() {
                       <Box
                         component="img"
                         src={pendingImage.url}
+                        onLoad={scrollToBottom}
                         sx={{
                           width: 220,
                           borderRadius: 2,
@@ -1508,11 +1646,21 @@ export default function DesignWorkspacePage() {
                 {allPreviewImages?.length > 0 && !isGenerating && (
                   <Box
                     sx={{
-                      display: "flex",
-                      gap: 1.2,
-                      flexWrap: "wrap",
-                      alignItems: "center",
+                      maxHeight: 130,
+                      overflowY: "auto",
+                      pr: 0.5,
                       mb: 1.2,
+
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1.2,
+                      alignItems: "flex-start",
+
+                      "&::-webkit-scrollbar": { width: 6 },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#D1D5DB",
+                        borderRadius: 3,
+                      },
                     }}
                   >
                     {allPreviewImages?.map((img) => (
@@ -1547,8 +1695,8 @@ export default function DesignWorkspacePage() {
                             position: "absolute",
                             top: 4,
                             right: 4,
-                            width: 16,
-                            height: 16,
+                            width: 14,
+                            height: 14,
                             bgcolor: "rgba(0,0,0,0.65)",
                             color: "#fff",
                             zIndex: 2,
@@ -1581,10 +1729,10 @@ export default function DesignWorkspacePage() {
                     }
                   }}
                   onPaste={handlePaste}
-                  rows={3}
+                  rows={4}
                   style={{
                     flex: 1,
-                    minHeight: 72,
+                    minHeight: 90,
                     maxHeight: 140,
                     overflowY: "auto",
                     border: "none",
@@ -1631,6 +1779,16 @@ export default function DesignWorkspacePage() {
         setExportSelections={setExportSelections}
         propertyId={propertyId}
         userId={userId}
+      />
+      <ConfirmModal
+        open={!!deleteTargetId}
+        title="Delete Iteration History"
+        description="Are you sure you want to delete this image from iteration history? This action cannot be reversed."
+        confirmText="Delete"
+        cancelText="Cancel"
+        loading={deleteLoading}
+        onConfirm={confirmDeleteIteration}
+        onCancel={() => setDeleteTargetId(null)}
       />
     </>
   );

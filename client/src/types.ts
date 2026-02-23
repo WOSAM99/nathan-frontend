@@ -185,7 +185,6 @@ export interface CategoryFormValues {
 
 export interface IterationItem {
   id: string;
-  v: string;
   url: string;
   description: string;
   category: string;
