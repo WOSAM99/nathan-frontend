@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -31,6 +31,8 @@ import { DeleteTarget, Photo } from "@/types";
 import RenameCategoryModal from "@/components/RenameCategoryModal";
 import AddCategoryModal from "@/components/AddCategoryModal";
 import Add from "@mui/icons-material/Add";
+import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import ImagePreviewModal from "@/components/ImagePreviewModal";
 
 /* ===== DESIGN TOKENS ===== */
 const ui = {
@@ -62,7 +64,9 @@ export default function PhotoSelectionPage() {
   const [renameCategoryName, setRenameCategoryName] = useState<string>("");
   const [renameLoading, setRenameLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
-  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+  const [addCategoryOpen, setAddCategoryOpen] = useState<boolean>(false);
+  const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const propertyId = useMemo(() => params.id || "", [params.id]);
 
@@ -84,6 +88,16 @@ export default function PhotoSelectionPage() {
     () => photos?.filter((p) => p.roomCategory === selectedCategory),
     [photos, selectedCategory],
   );
+
+  const openPreview = useCallback((url: string) => {
+    setPreviewUrl(url);
+    setPreviewOpen(true);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewUrl(null);
+  }, []);
 
   const loadPropertyImages = useCallback(async () => {
     if (!propertyId || !userId) return;
@@ -492,6 +506,7 @@ export default function PhotoSelectionPage() {
                       borderRadius: ui.cardRadius,
                       boxShadow: "0px 2px 6px rgba(0,0,0,0.06)",
                       border: `1px solid ${ui.border}`,
+                      "&:hover .preview-btn": { opacity: 1 },
                     }}
                   >
                     <CardMedia
@@ -504,6 +519,27 @@ export default function PhotoSelectionPage() {
                         aspectRatio: "4 / 3",
                       }}
                     />
+                    <IconButton
+                      className="preview-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPreview(photo.src);
+                      }}
+                      sx={{
+                        position: "absolute",
+                        width: 22,
+                        height: 22,
+                        bottom: 8,
+                        left: 8,
+                        bgcolor: "rgba(0,0,0,0.6)",
+                        color: "#fff",
+                        opacity: 0,
+                        transition: "0.2s",
+                        "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                      }}
+                    >
+                      <OpenInFullIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
 
                     <Box
                       sx={{
@@ -657,7 +693,6 @@ export default function PhotoSelectionPage() {
           </Button>
         </Box>
       </Box>
-
       <ConfirmModal
         open={Boolean(deleteTarget)}
         title={
@@ -674,7 +709,6 @@ export default function PhotoSelectionPage() {
         cancelText="Cancel"
         loading={deleteLoading}
       />
-
       <RenameCategoryModal
         open={renameModalOpen}
         initialValue={renameCategoryName}
@@ -682,13 +716,17 @@ export default function PhotoSelectionPage() {
         onCancel={() => setRenameModalOpen(false)}
         onConfirm={(newName) => renameCategory(renameCategoryName, newName)}
       />
-
       <AddCategoryModal
         open={addCategoryOpen}
         onClose={() => setAddCategoryOpen(false)}
         propertyId={propertyId}
         userId={String(userId)}
         onSuccess={loadPropertyImages}
+      />
+      <ImagePreviewModal
+        open={previewOpen}
+        imageUrl={previewUrl}
+        onClose={closePreview}
       />
     </>
   );

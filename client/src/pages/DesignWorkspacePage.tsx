@@ -37,6 +37,8 @@ import FinalSelectionModal from "@/components/FinalSelectionModal";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import Tooltip from "@mui/material/Tooltip";
 import ConfirmModal from "@/components/ConfirmModal";
+import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import ImagePreviewModal from "@/components/ImagePreviewModal";
 
 /* ================= DESIGN TOKENS ================= */
 const ui = {
@@ -104,6 +106,9 @@ export default function DesignWorkspacePage() {
   const [pastedImageUrls, setPastedImageUrls] = useState<string[]>([]);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const propertyId = useMemo(() => params?.id || "", [params?.id]);
 
@@ -121,8 +126,39 @@ export default function DesignWorkspacePage() {
       .filter((img: any) => selectedCompsIds.includes(img.id))
       .map((img: any) => ({ ...img, source: "comps" }));
 
-    return [...baseline, ...comps];
-  }, [spaceImages, selectedImages, selectedBaselineIds, selectedCompsIds]);
+    const current =
+      currentImage && selectedUrls.includes(currentImage)
+        ? [{ id: currentImage, url: currentImage, source: "current" }]
+        : [];
+
+    const iterations = iterationHistory
+      .filter((item) => selectedUrls.includes(item.url))
+      .map((item) => ({
+        id: item.id,
+        url: item.url,
+        source: "iteration",
+      }));
+
+    // merge all
+    const merged = [...baseline, ...comps, ...current, ...iterations];
+
+    const map = new Map<string, any>();
+    merged.forEach((img) => {
+      if (!map.has(img.url)) {
+        map.set(img.url, img);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [
+    spaceImages,
+    selectedImages,
+    currentImage,
+    selectedUrls,
+    iterationHistory,
+    selectedBaselineIds,
+    selectedCompsIds,
+  ]);
 
   const allPreviewImages = useMemo(() => {
     const selected = selectedPreviewImages.map((img: any) => ({
@@ -151,9 +187,35 @@ export default function DesignWorkspacePage() {
     return map;
   }, [iterationHistory]);
 
-  const handleSwapWithCurrent = (item: any) => {
+  const openPreview = useCallback((url: string) => {
+    setPreviewUrl(url);
+    setPreviewOpen(true);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewUrl(null);
+  }, []);
+
+  const handleSwapWithCurrent = useCallback((item: any) => {
     setCurrentImage(item.url);
-  };
+  }, []);
+
+  const toggleCurrentSelect = useCallback(() => {
+    if (!currentImage) return;
+
+    setSelectedUrls((prev) =>
+      prev.includes(currentImage)
+        ? prev.filter((u) => u !== currentImage)
+        : [...prev, currentImage],
+    );
+  }, [currentImage]);
+
+  const toggleIterationSelect = useCallback((url: string) => {
+    setSelectedUrls((prev) =>
+      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url],
+    );
+  }, []);
 
   const saveIterationToHistory = useCallback(
     (image: { url: string; description: string }) => {
@@ -219,6 +281,8 @@ export default function DesignWorkspacePage() {
           URL.revokeObjectURL(pastedImages[index].preview);
           setPastedImages((prev) => prev.filter((_, i) => i !== index));
         }
+      } else if (img.type === "current" || img.type === "iteration") {
+        setSelectedUrls((prev) => prev.filter((u) => u !== img.url));
       }
     },
     [pastedImages],
@@ -269,7 +333,11 @@ export default function DesignWorkspacePage() {
   const handleExecute = useCallback(async () => {
     if (isGenerating) return;
 
-    if (selectedBaselineIds?.length === 0 && selectedCompsIds?.length === 0) {
+    if (
+      selectedBaselineIds?.length === 0 &&
+      selectedCompsIds?.length === 0 &&
+      selectedUrls?.length === 0
+    ) {
       showSnackbar(
         "Please select at least one image (Baseline or Market Comps)",
         "warning",
@@ -288,6 +356,17 @@ export default function DesignWorkspacePage() {
     /* ========= BUILD PAYLOAD ========= */
 
     const images: Record<string, string> = {};
+
+    // iteration images
+    selectedUrls.forEach((url) => {
+      const img = iterationHistory.find((i) => i.url === url);
+
+      if (img) {
+        images[img.id] = img.category || activeSpace;
+      } else {
+        images[url] = activeSpace; // current image case
+      }
+    });
 
     selectedBaselineIds.forEach((id) => {
       const img = spaceImages?.find((i) => i.id === id);
@@ -328,13 +407,18 @@ export default function DesignWorkspacePage() {
 
     setSelectedBaselineIds([]);
     setSelectedCompsIds([]);
+    setSelectedUrls([]);
 
     /* ========= SHOW LOADING AI MESSAGE ========= */
 
     setIsGenerating(true);
     setMessages((prev) => [
       ...prev,
-      { sender: "ai", text: "Generating your design..." },
+      {
+        sender: "ai",
+        text: "Generating your design...",
+        isLoading: true,
+      },
     ]);
 
     try {
@@ -346,11 +430,11 @@ export default function DesignWorkspacePage() {
       setIsGenerating(false);
 
       /* ========= REMOVE LOADING ========= */
-      setMessages((prev) => prev.slice(0, -1));
+      setMessages((prev) => prev.filter((m) => !m.isLoading));
 
       /* ========= ADD AI RESPONSE ========= */
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((m) => !m.isLoading),
         {
           sender: "ai",
           text: res?.description || "New design generated.",
@@ -381,6 +465,8 @@ export default function DesignWorkspacePage() {
     userId,
     showSnackbar,
     spaceImages,
+    selectedUrls,
+    iterationHistory,
     activeSpace,
     selectedImages,
     selectedAddress,
@@ -789,7 +875,7 @@ export default function DesignWorkspacePage() {
                   <Box
                     sx={{
                       width: "100%",
-                      maxWidth: 420,
+                      maxWidth: 350,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -838,7 +924,7 @@ export default function DesignWorkspacePage() {
                       borderRadius: ui.cardRadius,
                       width: "100%",
                       position: "relative",
-                      maxWidth: 420,
+                      maxWidth: 360,
                       aspectRatio: "4 / 3",
                       overflow: "hidden",
                       backgroundColor: "white",
@@ -848,6 +934,7 @@ export default function DesignWorkspacePage() {
                         ? `3px solid ${ui.blue}`
                         : `1px solid ${ui.border}`,
                       cursor: "pointer",
+                      "&:hover .preview-btn": { opacity: 1 },
                     }}
                   >
                     {spaceImages?.length > 0 ? (
@@ -862,6 +949,27 @@ export default function DesignWorkspacePage() {
                             borderRadius: ui.cardRadius,
                           }}
                         />
+                        <IconButton
+                          className="preview-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPreview(spaceImages[currentIndex]?.url);
+                          }}
+                          sx={{
+                            position: "absolute",
+                            bottom: 8,
+                            left: 8,
+                            bgcolor: "rgba(0,0,0,0.6)",
+                            color: "#fff",
+                            width: 22,
+                            height: 22,
+                            opacity: 0,
+                            transition: "0.2s",
+                            "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                          }}
+                        >
+                          <OpenInFullIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
                         {selectedBaselineIds?.includes(
                           spaceImages[currentIndex]?.id,
                         ) && (
@@ -909,7 +1017,6 @@ export default function DesignWorkspacePage() {
                             </IconButton>
                           </>
                         )}
-
                         <Chip
                           label={`${currentIndex + 1} / ${spaceImages?.length}`}
                           sx={{
@@ -969,13 +1076,19 @@ export default function DesignWorkspacePage() {
                     </Box>
 
                     <Card
+                      onClick={toggleCurrentSelect}
                       sx={{
+                        position: "relative",
                         width: "100%",
-                        maxWidth: 420,
+                        maxWidth: 360,
                         aspectRatio: "4 / 3",
                         borderRadius: ui.cardRadius,
                         overflow: "hidden",
                         backgroundColor: "white",
+                        border: selectedUrls.includes(currentImage)
+                          ? `3px solid ${ui.blue}`
+                          : `1px solid ${ui.border}`,
+                        cursor: "pointer",
                       }}
                     >
                       <CardMedia
@@ -987,6 +1100,40 @@ export default function DesignWorkspacePage() {
                           objectFit: "cover",
                         }}
                       />
+                      <IconButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPreview(currentImage);
+                        }}
+                        sx={{
+                          position: "absolute",
+                          bottom: 8,
+                          left: 8,
+                          bgcolor: "rgba(0,0,0,0.6)",
+                          color: "#fff",
+                          width: 22,
+                          height: 22,
+                          opacity: 0,
+                          transition: "0.2s",
+                          ".MuiCard-root:hover &": { opacity: 1 },
+                          "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                        }}
+                      >
+                        <OpenInFullIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      {selectedUrls?.includes(currentImage) && (
+                        <Check
+                          sx={{
+                            position: "absolute",
+                            top: 12,
+                            right: 12,
+                            bgcolor: ui.blue,
+                            color: "white",
+                            borderRadius: "50%",
+                            p: 0.6,
+                          }}
+                        />
+                      )}
                     </Card>
                   </Grid>
                 )}
@@ -1095,23 +1242,65 @@ export default function DesignWorkspacePage() {
                     >
                       {iterationHistory?.map((item, i) => {
                         const isCurrent = item.url === currentImage;
+                        const selected = selectedUrls.includes(item.url);
                         return (
                           <Paper
                             key={i}
+                            onClick={() => {
+                              toggleIterationSelect(item.url);
+                            }}
                             sx={{
                               minWidth: "23%",
                               maxWidth: "23%",
                               height: 200,
                               borderRadius: 3,
-                              border: `1px solid ${ui.border}`,
+                              border: selected
+                                ? `3px solid ${ui.blue}`
+                                : `1px solid ${ui.border}`,
                               overflow: "hidden",
                               position: "relative",
                               bgcolor: "white",
                               display: "flex",
                               cursor: "pointer",
                               "&:hover .swap-btn": { opacity: 1 },
+                              "&:hover .preview-btn": { opacity: 1 },
                             }}
                           >
+                            <IconButton
+                              className="preview-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPreview(item.url);
+                              }}
+                              sx={{
+                                position: "absolute",
+                                bottom: 6,
+                                left: 6,
+                                bgcolor: "rgba(0,0,0,0.6)",
+                                color: "#fff",
+                                width: 22,
+                                height: 22,
+                                opacity: 0,
+                                transition: "0.2s",
+                                "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                              }}
+                            >
+                              <OpenInFullIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                            {selected && (
+                              <Check
+                                sx={{
+                                  position: "absolute",
+                                  top: 6,
+                                  right: 6,
+                                  bgcolor: ui.blue,
+                                  color: "white",
+                                  borderRadius: "50%",
+                                  p: 0.4,
+                                  zIndex: 4,
+                                }}
+                              />
+                            )}
                             <Tooltip
                               title="Delete"
                               arrow
@@ -1163,10 +1352,13 @@ export default function DesignWorkspacePage() {
                               >
                                 <IconButton
                                   size="small"
-                                  onClick={() => handleSwapWithCurrent(item)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSwapWithCurrent(item);
+                                  }}
                                   sx={{
                                     position: "absolute",
-                                    top: 6,
+                                    bottom: 6,
                                     right: 6,
                                     bgcolor: "rgba(0,0,0,0.6)",
                                     color: "#fff",
@@ -1336,8 +1528,30 @@ export default function DesignWorkspacePage() {
                                   border: selected
                                     ? `3px solid ${ui.blue}`
                                     : `1px solid ${ui.border}`,
+                                  "&:hover .preview-btn": { opacity: 1 },
                                 }}
                               >
+                                <IconButton
+                                  className="preview-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openPreview(img.url);
+                                  }}
+                                  sx={{
+                                    position: "absolute",
+                                    bottom: 6,
+                                    left: 6,
+                                    bgcolor: "rgba(0,0,0,0.6)",
+                                    color: "#fff",
+                                    width: 22,
+                                    height: 22,
+                                    opacity: 0,
+                                    transition: "0.2s",
+                                    "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                                  }}
+                                >
+                                  <OpenInFullIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
                                 <CardMedia
                                   component="img"
                                   image={img.url}
@@ -1471,7 +1685,7 @@ export default function DesignWorkspacePage() {
                           wordBreak: "break-word",
                           whiteSpace: "pre-wrap",
 
-                          ...(isGenerating && index === messages?.length - 1
+                          ...(msg?.isLoading
                             ? {
                                 animation: "blink 1.2s infinite",
                                 "@keyframes blink": {
@@ -1491,12 +1705,21 @@ export default function DesignWorkspacePage() {
                                 component="img"
                                 src={img.url}
                                 onLoad={scrollToBottom}
+                                onClick={() => openPreview(img.url)}
                                 sx={{
                                   width: 72,
                                   height: 72,
                                   objectFit: "cover",
                                   borderRadius: 1.5,
                                   border: `1px solid ${ui.border}`,
+                                  cursor: "pointer",
+                                  transition: "0.2s",
+                                  transform: "translateZ(0)",
+                                  backfaceVisibility: "hidden",
+                                  "&:hover": {
+                                    transform: "scale(1.05)",
+                                    boxShadow: "0px 4px 12px rgba(0,0,0,0.25)",
+                                  },
                                 }}
                               />
                             ))}
@@ -1532,12 +1755,19 @@ export default function DesignWorkspacePage() {
                               key={i}
                               component="img"
                               src={img.url}
+                              onClick={() => openPreview(img.url)}
                               sx={{
                                 width: 72,
                                 height: 72,
                                 objectFit: "cover",
                                 borderRadius: 1.5,
                                 border: `1px solid ${ui.border}`,
+                                cursor: "pointer",
+                                transition: "0.2s",
+                                "&:hover": {
+                                  transform: "scale(1.05)",
+                                  boxShadow: "0px 4px 12px rgba(0,0,0,0.25)",
+                                },
                               }}
                             />
                           ))}
@@ -1643,7 +1873,7 @@ export default function DesignWorkspacePage() {
                   gap: 1.2,
                 }}
               >
-                {allPreviewImages?.length > 0 && !isGenerating && (
+                {allPreviewImages?.length > 0 && (
                   <Box
                     sx={{
                       maxHeight: 130,
@@ -1789,6 +2019,11 @@ export default function DesignWorkspacePage() {
         loading={deleteLoading}
         onConfirm={confirmDeleteIteration}
         onCancel={() => setDeleteTargetId(null)}
+      />
+      <ImagePreviewModal
+        open={previewOpen}
+        imageUrl={previewUrl}
+        onClose={closePreview}
       />
     </>
   );

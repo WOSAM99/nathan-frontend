@@ -29,5 +29,23 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // Proxy API calls to avoid CORS issues when backend is on ngrok
+    proxy: {
+      "/auth": {
+        target: "https://d387-115-96-27-193.ngrok-free.app",
+        changeOrigin: true,
+        secure: true,
+      },
+      "/doc": {
+        target: "https://d387-115-96-27-193.ngrok-free.app",
+        changeOrigin: true,
+        secure: true,
+      },
+      "/chat": {
+        target: "https://d387-115-96-27-193.ngrok-free.app",
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
 });

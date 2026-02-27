@@ -1,8 +1,8 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { CssBaseline } from "@mui/material";
 import { queryClient } from "@/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { SnackbarProvider } from "notistack";
 
@@ -14,11 +14,33 @@ import DesignWorkspacePage from "@/pages/DesignWorkspacePage";
 import { ThemeProvider } from "@mui/material";
 import { theme } from "./theme";
 import FinalPropertySelection from "./pages/FinalPropertySelectionPage";
+import LoadingScreen from "@/components/LoadingScreen";
+import { useEffect } from "react";
 
-function Router() {
+function AppRoutes() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && location !== "/") {
+      setLocation("/", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, location, setLocation]);
+
+  if (isLoading) return <LoadingScreen />;
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/" component={AuthPage} />
+        <Route>
+          <Redirect to="/" replace />
+        </Route>
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
-      <Route path="/" component={AuthPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/new-project" component={ProjectSetupPage} />
       <Route path="/organize/:id" component={PhotoSelectionPage} />
@@ -27,7 +49,9 @@ function Router() {
         path="/property-selection/:id"
         component={FinalPropertySelection}
       />
-      <Route component={NotFoundPage} />
+      <Route>
+        <Redirect to="/dashboard" replace />
+      </Route>
     </Switch>
   );
 }
@@ -44,7 +68,7 @@ function App() {
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <AuthProvider>
-            <Router />
+            <AppRoutes />
           </AuthProvider>
         </SnackbarProvider>
       </ThemeProvider>

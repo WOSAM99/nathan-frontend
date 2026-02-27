@@ -3,6 +3,7 @@ import {
   ChatRegenerateRequest,
   ChatRegenerateResponse,
   LoginRequest,
+  LoginResponse,
   Project,
   PropertyDetails,
   RegisterRequest,
@@ -39,6 +40,7 @@ class ApiClient {
     // Create headers object with proper typing
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true", // Bypass ngrok browser warning page
     };
 
     // Merge any existing headers from options
@@ -49,18 +51,12 @@ class ApiClient {
     // Add Authorization header if token exists
     if (this.accessToken) {
       headers["Authorization"] = `Bearer ${this.accessToken}`;
-      console.log(
-        `[API] Authorization header set:`,
-        headers["Authorization"].substring(0, 30) + "...",
-      );
-    } else {
-      console.warn(`[API] No access token available for ${endpoint}`);
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
-      credentials: "include", // Include cookies for refresh token
+      credentials: "omit", // Must be "omit" when backend uses Access-Control-Allow-Origin: * (wildcard)
     });
 
     // Don't automatically refresh on 401 - let the error propagate
@@ -86,7 +82,7 @@ class ApiClient {
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
         },
-        credentials: "include", // Send HttpOnly cookie automatically
+        credentials: "omit", // Must be "omit" when backend uses Access-Control-Allow-Origin: *
         // No body - backend uses cookie
       });
 
@@ -120,27 +116,36 @@ class ApiClient {
   }
 
   isAuthenticated(): boolean {
-    return !!this.accessToken;
+    return !!localStorage.getItem("access_token");
   }
 
-  async login(data: LoginRequest): Promise<AuthTokens> {
-    const tokens = await this.request<AuthTokens>("/auth/login", {
+  async login(data: LoginRequest): Promise<LoginResponse> {
+    const res = await this.request<LoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(data),
     });
-    console.log("Login response tokens:", tokens);
-    this.setTokens(tokens);
-    return tokens;
+
+    // store only tokens in token storage
+    this.setTokens({
+      access_token: res.access_token,
+      refresh_token: res.refresh_token,
+    });
+
+    return res;
   }
 
-  async register(data: RegisterRequest): Promise<AuthTokens> {
-    const tokens = await this.request<AuthTokens>("/auth/register", {
+  async register(data: RegisterRequest): Promise<LoginResponse> {
+    const res = await this.request<LoginResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     });
-    console.log("Register response tokens:", tokens);
-    this.setTokens(tokens);
-    return tokens;
+
+    this.setTokens({
+      access_token: res.access_token,
+      refresh_token: res.refresh_token,
+    });
+
+    return res;
   }
 
   async logout(): Promise<void> {
@@ -205,7 +210,7 @@ class ApiClient {
         Authorization: `Bearer ${this.accessToken}`,
         // Content-Type not set for FormData
       },
-      credentials: "include",
+      credentials: "omit",
       body: formData,
     });
 
@@ -323,8 +328,9 @@ class ApiClient {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
+        "ngrok-skip-browser-warning": "true",
       },
-      credentials: "include",
+      credentials: "omit",
       body: formData,
     });
 
@@ -375,8 +381,9 @@ class ApiClient {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
+        "ngrok-skip-browser-warning": "true",
       },
-      credentials: "include",
+      credentials: "omit",
       body: formData,
     });
 
@@ -422,6 +429,23 @@ class ApiClient {
         user_id,
       }),
     });
+  }
+
+  async deleteProperty(
+    property_id: string,
+    user_id: string,
+  ): Promise<{
+    message: string;
+    property_id: string;
+    property_data_deleted: boolean;
+    chat_history_deleted: boolean;
+  }> {
+    return this.request(
+      `/doc/property/delete?property_id=${property_id}&user_id=${user_id}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 }
 

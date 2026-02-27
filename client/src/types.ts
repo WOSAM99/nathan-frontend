@@ -1,8 +1,8 @@
 export interface AuthTokens {
   access_token: string;
   refresh_token: string;
-  token_type: string;
-  user_id: string;
+  token_type?: string;
+  user_id?: string;
 }
 
 export interface LoginRequest {
@@ -161,6 +161,7 @@ export type ChatMessage = {
   sender: "user" | "ai";
   text: string;
   images?: { url: string }[];
+  isLoading?: boolean;
 };
 
 export interface RenameCategoryModalProps {
@@ -188,4 +189,18 @@ export interface IterationItem {
   url: string;
   description: string;
   category: string;
+}
+
+export interface PendingDesignJob {
+  propertyId: string;
+  userMessage: string;
+  chatImages: { url: string }[];
+  createdAt: number;
+  previousMessageCount: number;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  user_id: string;
 };

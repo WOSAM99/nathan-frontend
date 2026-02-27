@@ -329,7 +329,7 @@ export default function ProjectSetupPage() {
               },
             }}
           >
-            {isSubmitting ? "Processing..." : "IMPORT PHOTOS"}
+            {"IMPORT PHOTOS"}
           </Button>
         </Box>
       </Box>

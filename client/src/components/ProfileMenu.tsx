@@ -11,10 +11,11 @@ import {
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import { api } from "@/lib/api";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ProfileMenu() {
+  const { logout } = useAuth();
   const [, setLocation] = useLocation();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -31,9 +32,8 @@ export default function ProfileMenu() {
 
   const handleLogout = useCallback(async () => {
     handleMenuClose();
-    await api.logout();
-    setLocation("/");
-  }, [handleMenuClose, setLocation]);
+    await logout();
+  }, [handleMenuClose, logout]);
 
   return (
     <Box>

@@ -7,10 +7,7 @@ import {
   CardMedia,
   CardContent,
   Button,
-  TextField,
   IconButton,
-  Tabs,
-  Tab,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation } from "wouter";
@@ -18,14 +15,28 @@ import { api } from "@/lib/api";
 import AppNavbar from "@/components/AppNavBar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Project } from "@/types";
+import { DeleteOutline } from "@mui/icons-material";
+import ConfirmModal from "@/components/ConfirmModal";
+import { useAppSnackbar } from "@/hooks/useAppSnackbar";
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const { userId } = useAuth();
+  const { showSnackbar } = useAppSnackbar();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [tab, setTab] = useState<number>(0);
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+
+  const handleCancelDelete = useCallback(() => {
+    if (deleteLoading) return;
+    setConfirmOpen(false);
+    setSelectedProjectId(null);
+  }, [deleteLoading]);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -39,6 +50,29 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, [userId]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!selectedProjectId || !userId) return;
+
+    try {
+      setDeleteLoading(true);
+
+      const res = await api.deleteProperty(selectedProjectId, userId);
+
+      if (res?.property_data_deleted) {
+        showSnackbar("Workspace deleted successfully", "success");
+        await loadProjects();
+      }
+
+      setConfirmOpen(false);
+      setSelectedProjectId(null);
+    } catch (e) {
+      console.error("Delete failed", e);
+    } finally {
+      setDeleteLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, userId, loadProjects]);
 
   useEffect(() => {
     loadProjects();
@@ -102,6 +136,31 @@ export default function DashboardPage() {
                   position: "relative",
                 }}
               >
+                <IconButton
+                  sx={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    width: 28,
+                    height: 28,
+                    bgcolor: "#fff",
+                    border: `1px solid #E5E7EB`,
+                    boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
+                    "&:hover": {
+                      bgcolor: "#fff",
+                    },
+                    "&:hover .MuiSvgIcon-root": {
+                      color: "#000",
+                    },
+                  }}
+                  onClick={(e) => {
+                    setSelectedProjectId(project.property_id);
+                    setConfirmOpen(true);
+                  }}
+                >
+                  <DeleteOutline sx={{ color: "#000", fontSize: 18 }} />
+                </IconButton>
+
                 {/* IMAGE */}
                 <CardMedia
                   component="img"
@@ -210,6 +269,16 @@ export default function DashboardPage() {
           </Grid>
         </Grid>
       )}
+      <ConfirmModal
+        open={confirmOpen}
+        title="Delete Workspace"
+        description="Are you sure you want to delete this workspace? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        loading={deleteLoading}
+      />
     </Box>
   );
 }
