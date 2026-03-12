@@ -9,7 +9,7 @@ import {
   RegisterRequest,
 } from "@/types";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://10.0.1.178:8000";
+const API_BASE_URL = import.meta.env.API_BASE_URL || "http://3.13.32.73:8000";
 
 class ApiClient {
   private accessToken: string | null = null;
