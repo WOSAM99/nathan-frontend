@@ -220,7 +220,7 @@ export default function DesignWorkspacePage() {
 
   const saveIterationToHistory = useCallback(
     (image: { url: string; description: string }) => {
-      const tempId = crypto.randomUUID ? crypto.randomUUID() : uuidv4();
+      const tempId =  uuidv4();
 
       setIterationHistory((prev) => [
         {

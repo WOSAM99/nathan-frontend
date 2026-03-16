@@ -198,7 +198,7 @@ class ApiClient {
     const formData = new FormData();
     // Always send property_id (generate UUID if new)
     const actualPropertyId =
-      propertyId === "new" ? (crypto.randomUUID ? crypto.randomUUID() : uuidv4()) : propertyId;
+      propertyId === "new" ? uuidv4() : propertyId;
     formData.append("property_id", actualPropertyId);
 
     const fieldName = fileType === "mls" ? "mls_files" : "comps_files";
