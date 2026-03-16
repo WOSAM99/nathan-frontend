@@ -17,6 +17,7 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from "@mui/material";
+import { v4 as uuidv4 } from "uuid";
 import { useRoute } from "wouter";
 import { api } from "@/lib/api";
 import { useAppSnackbar } from "@/hooks/useAppSnackbar";
@@ -219,7 +220,7 @@ export default function DesignWorkspacePage() {
 
   const saveIterationToHistory = useCallback(
     (image: { url: string; description: string }) => {
-      const tempId = crypto.randomUUID();
+      const tempId = crypto.randomUUID ? crypto.randomUUID() : uuidv4();
 
       setIterationHistory((prev) => [
         {

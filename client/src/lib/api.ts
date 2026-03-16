@@ -8,6 +8,7 @@ import {
   PropertyDetails,
   RegisterRequest,
 } from "@/types";
+import { v4 as uuidv4 } from "uuid";
 
 const API_BASE_URL = import.meta.env.API_BASE_URL || "http://3.13.32.73:8000";
 
@@ -197,7 +198,7 @@ class ApiClient {
     const formData = new FormData();
     // Always send property_id (generate UUID if new)
     const actualPropertyId =
-      propertyId === "new" ? crypto.randomUUID() : propertyId;
+      propertyId === "new" ? (crypto.randomUUID ? crypto.randomUUID() : uuidv4()) : propertyId;
     formData.append("property_id", actualPropertyId);
 
     const fieldName = fileType === "mls" ? "mls_files" : "comps_files";
