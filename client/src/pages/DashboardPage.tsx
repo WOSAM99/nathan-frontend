@@ -8,6 +8,7 @@ import {
   CardContent,
   Button,
   IconButton,
+  Skeleton,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation } from "wouter";
@@ -110,6 +111,28 @@ export default function DashboardPage() {
           </Typography>
         </Box>
       </Box>
+
+      {/* ===== LOADING STATE ===== */}
+      {loading && (
+        <Grid
+          container
+          spacing={4}
+          sx={{
+            mx: "auto",
+            px: { xs: 2, sm: 4 },
+          }}
+        >
+          {[...Array(4)].map((i) => (
+            <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
+              <Skeleton
+                variant="rectangular"
+                height={340}
+                sx={{ borderRadius: 3 }}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       {/* ===== PROJECT GRID ===== */}
       {!loading && (

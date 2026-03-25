@@ -10,9 +10,8 @@ import {
   Menu,
   MenuItem,
   Paper,
-  Backdrop,
-  CircularProgress,
   Divider,
+  Skeleton,
 } from "@mui/material";
 
 import {
@@ -272,13 +271,6 @@ export default function PhotoSelectionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId, userId]);
 
-  if (loading) {
-    return (
-      <Backdrop open>
-        <CircularProgress />
-      </Backdrop>
-    );
-  }
 
   return (
     <>
@@ -351,110 +343,121 @@ export default function PhotoSelectionPage() {
               },
             }}
           >
-            {dynamicCategories?.map((cat) => {
-              return (
-                <Box
-                  key={cat?.id}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    px: 1.5,
-                    py: 1.2,
-                    borderRadius: 1,
-                    cursor: "pointer",
-                    bgcolor:
-                      selectedCategory === cat?.label
-                        ? "#0B1320"
-                        : "transparent",
-                    color: selectedCategory === cat?.label ? "white" : ui.text,
-
-                    "&:hover": {
-                      bgcolor:
-                        selectedCategory === cat?.label ? "#0B1320" : "#f3f3f3",
-                    },
-
-                    "&:hover .action-icons": {
-                      opacity: 1,
-                      pointerEvents: "auto",
-                    },
-                  }}
-                >
-                  {/* LEFT: Category name + count */}
+            {loading ? (
+              [...Array(4)].map((_, i) => (
+                <Skeleton
+                  key={i}
+                  variant="rectangular"
+                  height={45}
+                  sx={{ borderRadius: 1, mb: 1 }}
+                />
+              ))
+            ) : (
+              dynamicCategories?.map((cat) => {
+                return (
                   <Box
-                    onClick={() => setSelectedCategory(cat?.label)}
-                    sx={{ flex: 1 }}
-                  >
-                    <Typography
-                      sx={{
-                        fontSize: 14,
-                        letterSpacing: 1,
-                        lineHeight: 1,
-                        whiteSpace: "normal",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {cat?.label}{" "}
-                      <Typography
-                        component="span"
-                        sx={{
-                          fontSize: 14,
-                          color:
-                            selectedCategory === cat?.label ? "#fff" : ui.muted,
-                          whiteSpace: "nowrap",
-                          display: "inline",
-                        }}
-                      >
-                        ({cat?.count})
-                      </Typography>
-                    </Typography>
-                  </Box>
-                  <Box
-                    className="action-icons"
-                    display="flex"
-                    alignItems="center"
-                    gap={0.5}
+                    key={cat?.id}
                     sx={{
-                      opacity: 0,
-                      pointerEvents: "none",
-                      transition: "opacity 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      px: 1.5,
+                      py: 1.2,
+                      borderRadius: 1,
+                      cursor: "pointer",
+                      bgcolor:
+                        selectedCategory === cat?.label
+                          ? "#0B1320"
+                          : "transparent",
+                      color: selectedCategory === cat?.label ? "white" : ui.text,
+
+                      "&:hover": {
+                        bgcolor:
+                          selectedCategory === cat?.label ? "#0B1320" : "#f3f3f3",
+                      },
+
+                      "&:hover .action-icons": {
+                        opacity: 1,
+                        pointerEvents: "auto",
+                      },
                     }}
                   >
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRenameCategoryName(cat.label);
-                        setRenameModalOpen(true);
-                      }}
+                    {/* LEFT: Category name + count */}
+                    <Box
+                      onClick={() => setSelectedCategory(cat?.label)}
+                      sx={{ flex: 1 }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 14,
+                          letterSpacing: 1,
+                          lineHeight: 1,
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {cat?.label}{" "}
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: 14,
+                            color:
+                              selectedCategory === cat?.label ? "#fff" : ui.muted,
+                            whiteSpace: "nowrap",
+                            display: "inline",
+                          }}
+                        >
+                          ({cat?.count})
+                        </Typography>
+                      </Typography>
+                    </Box>
+                    <Box
+                      className="action-icons"
+                      display="flex"
+                      alignItems="center"
+                      gap={0.5}
                       sx={{
-                        color:
-                          selectedCategory === cat?.label ? "white" : ui.muted,
+                        opacity: 0,
+                        pointerEvents: "none",
+                        transition: "opacity 0.2s ease",
                       }}
                     >
-                      <EditOutlined fontSize="small" />
-                    </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenameCategoryName(cat.label);
+                          setRenameModalOpen(true);
+                        }}
+                        sx={{
+                          color:
+                            selectedCategory === cat?.label ? "white" : ui.muted,
+                        }}
+                      >
+                        <EditOutlined fontSize="small" />
+                      </IconButton>
 
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget({
-                          type: "category",
-                          category: cat.label,
-                        });
-                      }}
-                      sx={{
-                        color:
-                          selectedCategory === cat?.label ? "white" : ui.muted,
-                      }}
-                    >
-                      <DeleteOutline fontSize="small" />
-                    </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget({
+                            type: "category",
+                            category: cat.label,
+                          });
+                        }}
+                        sx={{
+                          color:
+                            selectedCategory === cat?.label ? "white" : ui.muted,
+                        }}
+                      >
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </Box>
-                </Box>
-              );
-            })}
+                );
+              })
+            )}
           </Box>
         </Paper>
 
@@ -490,122 +493,134 @@ export default function PhotoSelectionPage() {
               </Typography>
             </Box>
 
-            {filteredPhotos.length === 0 && (
+            {!loading && filteredPhotos.length === 0 && (
               <Typography sx={{ color: ui.muted, mt: 4 }}>
                 No images in this category
               </Typography>
             )}
             <Grid container spacing={3}>
-              {filteredPhotos?.map((photo) => (
-                <Grid key={photo?.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                  <Card
-                    onClick={() => toggleSelection(photo?.id)}
-                    sx={{
-                      position: "relative",
-                      cursor: "pointer",
-                      borderRadius: ui.cardRadius,
-                      boxShadow: "0px 2px 6px rgba(0,0,0,0.06)",
-                      border: `1px solid ${ui.border}`,
-                      "&:hover .preview-btn": { opacity: 1 },
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      image={photo?.src}
-                      sx={{
-                        width: "100%",
-                        height: 180,
-                        objectFit: "cover",
-                        aspectRatio: "4 / 3",
-                      }}
+              {loading ? (
+                [...Array(8)].map((_, i) => (
+                  <Grid key={i} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                    <Skeleton
+                      variant="rectangular"
+                      height={180}
+                      sx={{ borderRadius: ui.cardRadius }}
                     />
-                    <IconButton
-                      className="preview-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openPreview(photo.src);
-                      }}
+                  </Grid>
+                ))
+              ) : (
+                filteredPhotos?.map((photo) => (
+                  <Grid key={photo?.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+                    <Card
+                      onClick={() => toggleSelection(photo?.id)}
                       sx={{
-                        position: "absolute",
-                        width: 22,
-                        height: 22,
-                        bottom: 8,
-                        left: 8,
-                        bgcolor: "rgba(0,0,0,0.6)",
-                        color: "#fff",
-                        opacity: 0,
-                        transition: "0.2s",
-                        "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                        position: "relative",
+                        cursor: "pointer",
+                        borderRadius: ui.cardRadius,
+                        boxShadow: "0px 2px 6px rgba(0,0,0,0.06)",
+                        border: `1px solid ${ui.border}`,
+                        "&:hover .preview-btn": { opacity: 1 },
                       }}
                     >
-                      <OpenInFullIcon sx={{ fontSize: 14 }} />
-                    </IconButton>
-
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                        display: "flex",
-                        gap: 0.8,
-                      }}
-                    >
-                      {/* DELETE BUTTON (DUSTBIN) */}
-                      <IconButton
+                      <CardMedia
+                        component="img"
+                        image={photo?.src}
                         sx={{
-                          width: 28,
-                          height: 28,
-                          minWidth: 28,
-                          minHeight: 28,
-                          p: 0.5,
-                          bgcolor: "white",
-                          border: `1px solid ${ui.border}`,
-                          boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
-                          "&:hover": {
-                            bgcolor: "#fff",
-                          },
-                          "&:hover .MuiSvgIcon-root": {
-                            color: "#000",
-                          },
+                          width: "100%",
+                          height: 180,
+                          objectFit: "cover",
+                          aspectRatio: "4 / 3",
                         }}
+                      />
+                      <IconButton
+                        className="preview-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDeleteTarget({ type: "image", photo });
+                          openPreview(photo.src);
+                        }}
+                        sx={{
+                          position: "absolute",
+                          width: 22,
+                          height: 22,
+                          bottom: 8,
+                          left: 8,
+                          bgcolor: "rgba(0,0,0,0.6)",
+                          color: "#fff",
+                          opacity: 0,
+                          transition: "0.2s",
+                          "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
                         }}
                       >
-                        <DeleteOutline sx={{ color: ui.text, fontSize: 18 }} />
+                        <OpenInFullIcon sx={{ fontSize: 14 }} />
                       </IconButton>
 
-                      {/* EXISTING 3 DOT MENU */}
-                      <IconButton
+                      <Box
                         sx={{
-                          width: 28,
-                          height: 28,
-                          minWidth: 28,
-                          minHeight: 28,
-                          p: 0.5,
-                          bgcolor: "white",
-                          border: `1px solid ${ui.border}`,
-                          boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
-                          "&:hover": {
-                            bgcolor: "#fff",
-                          },
-                          "&:hover .MuiSvgIcon-root": {
-                            color: "#000",
-                          },
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActivePhoto(photo?.id);
-                          setMenuAnchor(e.currentTarget);
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          display: "flex",
+                          gap: 0.8,
                         }}
                       >
-                        <MoreHoriz sx={{ color: ui.text }} />
-                      </IconButton>
-                    </Box>
-                  </Card>
-                </Grid>
-              ))}
+                        {/* DELETE BUTTON (DUSTBIN) */}
+                        <IconButton
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            minWidth: 28,
+                            minHeight: 28,
+                            p: 0.5,
+                            bgcolor: "white",
+                            border: `1px solid ${ui.border}`,
+                            boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
+                            "&:hover": {
+                              bgcolor: "#fff",
+                            },
+                            "&:hover .MuiSvgIcon-root": {
+                              color: "#000",
+                            },
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget({ type: "image", photo });
+                          }}
+                        >
+                          <DeleteOutline sx={{ color: ui.text, fontSize: 18 }} />
+                        </IconButton>
+
+                        {/* EXISTING 3 DOT MENU */}
+                        <IconButton
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            minWidth: 28,
+                            minHeight: 28,
+                            p: 0.5,
+                            bgcolor: "white",
+                            border: `1px solid ${ui.border}`,
+                            boxShadow: "0px 2px 6px rgba(0,0,0,0.15)",
+                            "&:hover": {
+                              bgcolor: "#fff",
+                            },
+                            "&:hover .MuiSvgIcon-root": {
+                              color: "#000",
+                            },
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePhoto(photo?.id);
+                            setMenuAnchor(e.currentTarget);
+                          }}
+                        >
+                          <MoreHoriz sx={{ color: ui.text }} />
+                        </IconButton>
+                      </Box>
+                    </Card>
+                  </Grid>
+                ))
+              )}
             </Grid>
           </Paper>
         </Box>
