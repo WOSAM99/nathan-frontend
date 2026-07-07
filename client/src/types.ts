@@ -95,12 +95,19 @@ export interface Iteration {
 
 export interface ChatRegenerateRequest {
   property_id: string;
+  /** BASE images (user's own room photos / iterations): image_id -> caption.
+   *  The backend generates one redesigned output per entry. */
   images: Record<string, string>;
+  /** Style-only reference image URLs (comps photos + pasted uploads). */
+  reference_images?: string[];
   user_feedback: string;
+  user_id?: string | null;
+  /** Enable model reasoning/thinking for higher-quality (slower) generations. */
+  thinking?: boolean;
 }
 
 export interface ChatRegenerateResponse {
-  regenerated_images: Array<{ url: string; mime_type: string }>;
+  regenerated_images: Array<{ id?: string; url: string; mime_type: string }>;
   description: string;
   input_count: number;
   message: string;
@@ -162,6 +169,9 @@ export type ChatMessage = {
   text: string;
   images?: { url: string }[];
   isLoading?: boolean;
+  /** When set, offers "regenerate with thinking" — the stored payload is
+   *  replayed with thinking: true. Only present on non-thinking results. */
+  retryPayload?: ChatRegenerateRequest;
 };
 
 export interface RenameCategoryModalProps {

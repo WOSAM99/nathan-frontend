@@ -10,11 +10,12 @@ import {
 } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 
-const API_BASE_URL = import.meta.env.API_BASE_URL || "http://3.13.32.73:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 class ApiClient {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor() {
     this.accessToken = localStorage.getItem("access_token");
@@ -30,17 +31,20 @@ class ApiClient {
     return (response.data !== undefined ? response.data : response) as T;
   }
 
-  private async request<T>(
+  /**
+   * Authenticated fetch with automatic token refresh: on a 401 (expired
+   * access token), silently refresh once and replay the original request.
+   * Does not set Content-Type — callers decide (JSON vs multipart FormData).
+   */
+  private async authFetch(
     endpoint: string,
     options: RequestInit = {},
-  ): Promise<T> {
-    // Always get fresh tokens from localStorage
+    isRetry = false,
+  ): Promise<Response> {
+    // Always get fresh token from localStorage
     this.accessToken = localStorage.getItem("access_token");
-    this.refreshToken = localStorage.getItem("refresh_token");
 
-    // Create headers object with proper typing
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
       "ngrok-skip-browser-warning": "true", // Bypass ngrok browser warning page
     };
 
@@ -60,22 +64,64 @@ class ApiClient {
       credentials: "omit", // Must be "omit" when backend uses Access-Control-Allow-Origin: * (wildcard)
     });
 
-    // Don't automatically refresh on 401 - let the error propagate
-    // Only refresh when we get a specific "token expired" error
+    // Expired access token → refresh once and replay the request.
+    // /auth/* endpoints are excluded (a 401 there means bad credentials).
+    if (response.status === 401 && !isRetry && !endpoint.startsWith("/auth/")) {
+      const refreshed = await this.refreshTokens();
+      if (refreshed) {
+        return this.authFetch(endpoint, options, true);
+      }
+      this.handleSessionExpired();
+    }
+
+    return response;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+  ): Promise<T> {
+    const response = await this.authFetch(endpoint, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string> | undefined),
+      },
+    });
+
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Unknown error" }));
-      console.error(`[API] Error ${response.status}:`, error.message);
-      // Backend uses 'message' field for errors, not 'detail'
-      throw new Error(error.message || `API Error: ${response.status}`);
+      const error = await response.json().catch(() => ({}) as any);
+      // Backend uses 'message' on some errors and 'error' on error_response
+      const message =
+        error.message || error.error || `API Error: ${response.status}`;
+      console.error(`[API] Error ${response.status}:`, message);
+      throw new Error(message);
     }
 
     const json = await response.json();
     return this.unwrapResponse<T>(json);
   }
 
-  private async refreshTokens(): Promise<boolean> {
+  /**
+   * Single-flight refresh: concurrent 401s share one in-flight refresh.
+   * (The backend rotates refresh tokens on every use, so parallel
+   * refreshes would revoke each other and log the user out.)
+   */
+  private refreshTokens(): Promise<boolean> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.doRefreshTokens().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    return this.refreshPromise;
+  }
+
+  private async doRefreshTokens(): Promise<boolean> {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken || refreshToken === "undefined") {
+      return false;
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
@@ -84,25 +130,41 @@ class ApiClient {
           "ngrok-skip-browser-warning": "true",
         },
         credentials: "omit", // Must be "omit" when backend uses Access-Control-Allow-Origin: *
-        // No body - backend uses cookie
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
 
       if (!response.ok) {
-        this.clearTokens();
         return false;
       }
 
       const json = await response.json();
       const tokens = this.unwrapResponse<AuthTokens>(json);
+      if (!tokens.access_token || !tokens.refresh_token) {
+        return false;
+      }
       this.setTokens(tokens);
       return true;
     } catch {
-      this.clearTokens();
       return false;
     }
   }
 
+  /** Refresh failed → session is over. Clear state and go to login. */
+  private handleSessionExpired() {
+    this.clearTokens();
+    localStorage.removeItem("user_id");
+    if (window.location.pathname !== "/") {
+      window.location.replace("/");
+    }
+  }
+
   setTokens(tokens: AuthTokens) {
+    // Guard against storing missing tokens as the string "undefined"
+    // (e.g. an endpoint that returns a profile/message instead of tokens).
+    if (!tokens?.access_token || !tokens?.refresh_token) {
+      console.warn("[API] setTokens called without valid tokens — ignoring");
+      return;
+    }
     this.accessToken = tokens.access_token;
     this.refreshToken = tokens.refresh_token;
     localStorage.setItem("access_token", tokens.access_token);
@@ -192,9 +254,6 @@ class ApiClient {
     propertyId: string,
     fileType: "mls" | "comps" = "mls",
   ): Promise<{ success: boolean; message: string; property_id: string }> {
-    // Always get fresh token from localStorage
-    this.accessToken = localStorage.getItem("access_token");
-
     const formData = new FormData();
     // Always send property_id (generate UUID if new)
     const actualPropertyId =
@@ -205,13 +264,9 @@ class ApiClient {
 
     files.forEach((file) => formData.append(fieldName, file));
 
-    const response = await fetch(`${API_BASE_URL}/doc/upload`, {
+    // Content-Type intentionally not set for FormData
+    const response = await this.authFetch("/doc/upload", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        // Content-Type not set for FormData
-      },
-      credentials: "omit",
       body: formData,
     });
 
@@ -220,7 +275,7 @@ class ApiClient {
 
       try {
         const error = await response.json();
-        message = error.message || message;
+        message = error.message || error.error || message;
       } catch {}
 
       console.error(`[UPLOAD ERROR]`, message);
@@ -318,20 +373,13 @@ class ApiClient {
     user_id: string,
     file: File,
   ): Promise<{ url: string }> {
-    this.accessToken = localStorage.getItem("access_token");
-
     const formData = new FormData();
     formData.append("property_id", property_id);
     if (user_id) formData.append("user_id", user_id);
     formData.append("file", file);
 
-    const response = await fetch(`${API_BASE_URL}/chat/image/url`, {
+    const response = await this.authFetch("/chat/image/url", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        "ngrok-skip-browser-warning": "true",
-      },
-      credentials: "omit",
       body: formData,
     });
 
@@ -339,7 +387,7 @@ class ApiClient {
       let message = "Image upload failed";
       try {
         const err = await response.json();
-        message = err.message || message;
+        message = err.message || err.error || message;
       } catch {}
       throw new Error(message);
     }
@@ -375,16 +423,8 @@ class ApiClient {
   }
 
   async addCategory(formData: FormData): Promise<any> {
-    // Always get fresh token
-    this.accessToken = localStorage.getItem("access_token");
-
-    const response = await fetch(`${API_BASE_URL}/doc/add/category`, {
+    const response = await this.authFetch("/doc/add/category", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        "ngrok-skip-browser-warning": "true",
-      },
-      credentials: "omit",
       body: formData,
     });
 
@@ -393,7 +433,7 @@ class ApiClient {
 
       try {
         const error = await response.json();
-        message = error.message || message;
+        message = error.message || error.error || message;
       } catch {}
 
       throw new Error(message);

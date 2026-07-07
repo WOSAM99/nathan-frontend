@@ -17,6 +17,8 @@ import {
   AccordionSummary,
   AccordionDetails,
   Skeleton,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { v4 as uuidv4 } from "uuid";
 import { useRoute } from "wouter";
@@ -32,7 +34,12 @@ import Check from "@mui/icons-material/Check";
 import AutoAwesome from "@mui/icons-material/AutoAwesome";
 import CollectionsOutlined from "@mui/icons-material/CollectionsOutlined";
 import History from "@mui/icons-material/History";
-import { ChatMessage, IterationItem, PropertyDetails } from "@/types";
+import {
+  ChatMessage,
+  ChatRegenerateRequest,
+  IterationItem,
+  PropertyDetails,
+} from "@/types";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FinalSelectionModal from "@/components/FinalSelectionModal";
@@ -97,10 +104,6 @@ export default function DesignWorkspacePage() {
   const [pastedImages, setPastedImages] = useState<
     { file: File; preview: string }[]
   >([]);
-  const [pendingImage, setPendingImage] = useState<{
-    url: string;
-    description: string;
-  } | null>(null);
   const [isCompsExpanded, setIsCompsExpanded] = useState<boolean>(true);
   const [exportOpen, setExportOpen] = useState<boolean>(false);
   const [exportSelections, setExportSelections] = useState<
@@ -113,6 +116,8 @@ export default function DesignWorkspacePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(false);
+  const [uploadingCount, setUploadingCount] = useState<number>(0);
 
   const propertyId = useMemo(() => params?.id || "", [params?.id]);
 
@@ -234,12 +239,12 @@ export default function DesignWorkspacePage() {
   }, []);
 
   const saveIterationToHistory = useCallback(
-    (image: { url: string; description: string }) => {
-      const tempId = uuidv4();
-
+    (image: { id?: string; url: string; description: string }) => {
+      // Keep the server-generated id so this iteration can be used as a
+      // base image in later regenerations without a page reload.
       setIterationHistory((prev) => [
         {
-          id: tempId,
+          id: image?.id || uuidv4(),
           url: image?.url,
           description: image?.description,
           category: activeSpace,
@@ -340,8 +345,105 @@ export default function DesignWorkspacePage() {
     [spaceImages?.length],
   );
 
+  /**
+   * Run a regeneration request: shows the loading bubble, calls the API,
+   * appends the AI response (description + images) and auto-adds results
+   * to the iteration timeline. When `attachRetry` is true (non-thinking
+   * runs), the response card offers a one-click "regenerate with thinking".
+   */
+  const runGeneration = useCallback(
+    async (payload: ChatRegenerateRequest, attachRetry: boolean) => {
+      setIsGenerating(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: payload.thinking
+            ? "Thinking through your design..."
+            : "Generating your design...",
+          isLoading: true,
+        },
+      ]);
+
+      try {
+        const res = await api.regenerateDesign(payload);
+
+        // One generated image per base image — keep them all, with server IDs.
+        const newImages = (res?.regenerated_images || [])
+          .filter((img) => img?.url)
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            description: res?.description || "New design generated.",
+          }));
+
+        setIsGenerating(false);
+
+        /* ========= ADD AI RESPONSE (single card: description + images) ========= */
+        setMessages((prev) => [
+          ...prev.filter((m) => !m.isLoading),
+          {
+            sender: "ai",
+            text: res?.description || "New design generated.",
+            images: newImages.map((img) => ({ url: img.url })),
+            ...(attachRetry && newImages.length > 0
+              ? { retryPayload: { ...payload, thinking: true } }
+              : {}),
+          },
+        ]);
+
+        /* ========= WARN ON PARTIAL FAILURE ========= */
+        const requested = res?.input_count ?? 0;
+        if (requested > 0 && newImages.length < requested) {
+          showSnackbar(
+            `Generated ${newImages.length} of ${requested} images — some failed. Please try again.`,
+            "warning",
+          );
+        }
+
+        /* ========= AUTO-ADD TO TIMELINE ========= */
+        if (newImages.length > 0) {
+          newImages.forEach((img) => saveIterationToHistory(img));
+          setCurrentImage(newImages[0].url);
+        }
+      } catch (err) {
+        setIsGenerating(false);
+        console.log(err);
+        setMessages((prev) => prev.filter((m) => !m.isLoading));
+        showSnackbar("Failed to regenerate design", "error");
+      }
+    },
+    [saveIterationToHistory, showSnackbar],
+  );
+
+  const handleRetryWithThinking = useCallback(
+    (msgIndex: number) => {
+      if (isGenerating) return;
+
+      const payload = messages[msgIndex]?.retryPayload;
+      if (!payload) return;
+
+      // Remove the offer from the card so it can't be spammed.
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === msgIndex ? { ...m, retryPayload: undefined } : m,
+        ),
+      );
+
+      runGeneration(payload, false);
+    },
+    [isGenerating, messages, runGeneration],
+  );
+
   const handleExecute = useCallback(async () => {
     if (isGenerating) return;
+
+    // Don't fire while pasted references are still uploading — their URLs
+    // wouldn't be in the payload yet.
+    if (uploadingCount > 0) {
+      showSnackbar("Please wait for pasted images to finish uploading", "info");
+      return;
+    }
 
     if (!inputText.trim() && allPreviewImages.length === 0) return;
 
@@ -352,20 +454,24 @@ export default function DesignWorkspacePage() {
     }));
 
     /* ========= BUILD PAYLOAD ========= */
+    // `images` = BASE images (the user's own room photos / iterations) — the
+    // backend generates one redesigned output per entry.
+    // `reference_images` = style-only references (comps photos + pasted uploads).
 
     const images: Record<string, string> = {};
 
-    // iteration images
+    // Base: selected iteration / current images (resolved to server IDs)
     selectedUrls.forEach((url) => {
       const img = iterationHistory.find((i) => i.url === url);
 
       if (img) {
         images[img.id] = img.category || activeSpace;
       } else {
-        images[url] = activeSpace; // current image case
+        console.warn("Selected image not found in iteration history:", url);
       }
     });
 
+    // Base: the user's own room photos
     selectedBaselineIds.forEach((id) => {
       // Search across all categories
       const categoriesObj = propertyDetails?.files?.mls_images?.categories || {};
@@ -384,31 +490,29 @@ export default function DesignWorkspacePage() {
       if (foundImg) images[id] = foundCategory;
     });
 
+    // References: comps photos (style inspiration) + pasted uploads
+    const referenceUrls: string[] = [...pastedImageUrls];
+
     selectedCompsIds.forEach((id) => {
       // Search across all addresses
-      let foundImg: any = null;
-      let foundAddress = selectedAddress;
-
       if (compsImages?.addresses) {
-        for (const [addr, data] of Object.entries(compsImages.addresses)) {
+        for (const data of Object.values(compsImages.addresses)) {
           const img = (data as any)?.images?.find((i: any) => i?.id === id);
-          if (img) {
-            foundImg = img;
-            foundAddress = addr;
+          if (img?.url) {
+            referenceUrls.push(img.url);
             break;
           }
         }
       }
-
-      if (foundImg) images[id] = foundAddress;
     });
 
     const payload = {
       property_id: propertyId,
       images,
-      reference_images: pastedImageUrls,
+      reference_images: referenceUrls,
       user_feedback: userMessage,
       user_id: userId,
+      thinking: thinkingEnabled,
     };
 
     /* ========= ADD USER MESSAGE IMMEDIATELY ========= */
@@ -434,49 +538,8 @@ export default function DesignWorkspacePage() {
     setSelectedCompsIds([]);
     setSelectedUrls([]);
 
-    /* ========= SHOW LOADING AI MESSAGE ========= */
-
-    setIsGenerating(true);
-    setMessages((prev) => [
-      ...prev,
-      {
-        sender: "ai",
-        text: "Generating your design...",
-        isLoading: true,
-      },
-    ]);
-
-    try {
-      const res = await api.regenerateDesign(payload);
-
-      const newImageUrl = res?.regenerated_images?.[0]?.url;
-
-      setIsGenerating(false);
-
-      /* ========= REMOVE LOADING ========= */
-      setMessages((prev) => prev.filter((m) => !m.isLoading));
-
-      /* ========= ADD AI RESPONSE ========= */
-      setMessages((prev) => [
-        ...prev.filter((m) => !m.isLoading),
-        {
-          sender: "ai",
-          text: res?.description || "New design generated.",
-        },
-      ]);
-
-      setPendingImage({
-        url: newImageUrl,
-        description: res?.description || "New design generated.",
-      });
-    } catch (err) {
-      setIsGenerating(false);
-      console.log(err);
-      /* ========= REMOVE LOADING ONLY ========= */
-      setMessages((prev) => prev.slice(0, -1));
-
-      showSnackbar("Failed to regenerate design", "error");
-    }
+    /* ========= RUN GENERATION (offers thinking retry on non-thinking runs) ========= */
+    await runGeneration(payload, !payload.thinking);
   }, [
     isGenerating,
     selectedBaselineIds,
@@ -487,51 +550,17 @@ export default function DesignWorkspacePage() {
     propertyId,
     pastedImageUrls,
     userId,
-    showSnackbar,
     propertyDetails,
     selectedUrls,
     iterationHistory,
     activeSpace,
     compsImages,
     selectedAddress,
+    thinkingEnabled,
+    runGeneration,
+    uploadingCount,
+    showSnackbar,
   ]);
-
-  const handleAcceptGenerated = useCallback(() => {
-    if (!pendingImage) return;
-
-    saveIterationToHistory(pendingImage);
-
-    // set as current
-    setCurrentImage(pendingImage.url);
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        sender: "ai",
-        text: "Added to timeline.",
-        images: [{ url: pendingImage.url }],
-      },
-    ]);
-
-    setPendingImage(null);
-  }, [pendingImage, saveIterationToHistory]);
-
-  const handleRejectGenerated = useCallback(() => {
-    if (!pendingImage) return;
-
-    saveIterationToHistory(pendingImage);
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        sender: "ai",
-        text: "Saved to history.",
-        images: [{ url: pendingImage.url }],
-      },
-    ]);
-
-    setPendingImage(null);
-  }, [pendingImage, saveIterationToHistory]);
 
   const chatHistory = useCallback((chatHistory: any[]): ChatMessage[] => {
     if (!chatHistory?.length) return [];
@@ -698,41 +727,44 @@ export default function DesignWorkspacePage() {
 
       e.preventDefault();
 
-      try {
-        for (const file of imageFiles) {
-          // optional preview while uploading
+      // Track in-flight uploads so EXECUTE waits for them (avoids sending a
+      // generation whose pasted references haven't finished uploading).
+      setUploadingCount((c) => c + imageFiles.length);
+
+      // Upload in parallel — the uploads are independent.
+      await Promise.all(
+        imageFiles.map(async (file) => {
           const preview = URL.createObjectURL(file);
           setPastedImages((prev) => [...prev, { file, preview }]);
-
-          const res = await api.getImageUrl(
-            propertyId,
-            String(userId),
-            file, // send as multipart/form-data if backend expects
-          );
-
-          const url = res?.url;
-
-          if (url) {
-            setPastedImageUrls((prev) => [...prev, url]);
-
-            // replace preview with final URL preview
-            setPastedImages((prev) =>
-              prev.map((p) =>
-                p.preview === preview ? { ...p, preview: url } : p,
-              ),
+          try {
+            const res = await api.getImageUrl(
+              propertyId,
+              String(userId),
+              file,
             );
+            const url = res?.url;
+            if (url) {
+              setPastedImageUrls((prev) => [...prev, url]);
+              setPastedImages((prev) =>
+                prev.map((p) =>
+                  p.preview === preview ? { ...p, preview: url } : p,
+                ),
+              );
+            }
+          } catch (err) {
+            showSnackbar("Image upload failed", "error");
+          } finally {
+            setUploadingCount((c) => c - 1);
           }
-        }
-      } catch (err) {
-        showSnackbar("Image upload failed", "error");
-      }
+        }),
+      );
     },
     [propertyId, userId, showSnackbar],
   );
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, pendingImage, isGenerating, scrollToBottom]);
+  }, [messages, isGenerating, scrollToBottom]);
 
   useEffect(() => {
     setCurrentIndex(0);
@@ -1803,7 +1835,18 @@ export default function DesignWorkspacePage() {
                           }}
                         >
                           {msg?.images && msg.images.length > 0 && (
-                            <Box display="flex" gap={1} flexWrap="wrap">
+                            <Box
+                              sx={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  msg.images.length > 1
+                                    ? "repeat(2, 1fr)"
+                                    : "1fr",
+                                gap: 1,
+                                width: msg.images.length > 1 ? 340 : 260,
+                                maxWidth: "100%",
+                              }}
+                            >
                               {msg.images.map((img, i) => (
                                 <Box
                                   key={i}
@@ -1812,8 +1855,8 @@ export default function DesignWorkspacePage() {
                                   onLoad={scrollToBottom}
                                   onClick={() => openPreview(img.url)}
                                   sx={{
-                                    width: 72,
-                                    height: 72,
+                                    width: "100%",
+                                    aspectRatio: "4 / 3",
                                     objectFit: "cover",
                                     borderRadius: 1.5,
                                     border: `1px solid ${ui.border}`,
@@ -1822,7 +1865,7 @@ export default function DesignWorkspacePage() {
                                     transform: "translateZ(0)",
                                     backfaceVisibility: "hidden",
                                     "&:hover": {
-                                      transform: "scale(1.05)",
+                                      transform: "scale(1.03)",
                                       boxShadow: "0px 4px 12px rgba(0,0,0,0.25)",
                                     },
                                   }}
@@ -1832,6 +1875,47 @@ export default function DesignWorkspacePage() {
                           )}
 
                           <Typography color="#000">{msg?.text}</Typography>
+
+                          {msg?.retryPayload && (
+                            <Box
+                              sx={{
+                                mt: 0.5,
+                                pt: 1.25,
+                                borderTop: `1px solid ${ui.border}`,
+                              }}
+                            >
+                              <Typography
+                                fontSize={12}
+                                color={ui.muted}
+                                sx={{ mb: 0.75 }}
+                              >
+                                Want a better result? Regenerate this design
+                                with AI thinking enabled.
+                              </Typography>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                disabled={isGenerating}
+                                onClick={() => handleRetryWithThinking(index)}
+                                startIcon={
+                                  <AutoAwesome sx={{ fontSize: 14 }} />
+                                }
+                                sx={{
+                                  textTransform: "none",
+                                  fontSize: 12,
+                                  color: ui.text,
+                                  borderColor: ui.border,
+                                  bgcolor: "#fff",
+                                  "&:hover": {
+                                    bgcolor: "#fff",
+                                    borderColor: ui.muted,
+                                  },
+                                }}
+                              >
+                                Regenerate with Thinking
+                              </Button>
+                            </Box>
+                          )}
                         </Paper>
                       </Box>
                     ) : (
@@ -1892,74 +1976,6 @@ export default function DesignWorkspacePage() {
                       </Paper>
                     ),
                   ))}
-
-                {pendingImage && (
-                  <Box display="flex" gap={1} alignItems="flex-start">
-                    <Box
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        bgcolor: "#EAECEF",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <AutoAwesome fontSize="small" />
-                    </Box>
-
-                    {pendingImage?.url ? (
-                      <Paper
-                        sx={{
-                          p: 2,
-                          borderRadius: 2,
-                          border: `1px solid ${ui.border}`,
-                          bgcolor: "#F3F5F7",
-                          maxWidth: "85%",
-                        }}
-                      >
-                        {/* IMAGE PREVIEW */}
-                        <Box
-                          component="img"
-                          src={pendingImage.url}
-                          onLoad={scrollToBottom}
-                          sx={{
-                            width: 220,
-                            borderRadius: 2,
-                            mb: 1.5,
-                          }}
-                        />
-
-                        <Typography fontSize={13} sx={{ mb: 1 }}>
-                          Add this to your timeline?
-                        </Typography>
-
-                        <Box display="flex" gap={1}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={handleAcceptGenerated}
-                            sx={{ textTransform: "none" }}
-                            color="inherit"
-                          >
-                            Looks Great ✨
-                          </Button>
-
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={handleRejectGenerated}
-                            sx={{ textTransform: "none" }}
-                            color="inherit"
-                          >
-                            Try Another
-                          </Button>
-                        </Box>
-                      </Paper>
-                    ) : null}
-                  </Box>
-                )}
 
                 {/* Auto-scroll anchor */}
                 <div ref={chatEndRef} />
@@ -2083,26 +2099,59 @@ export default function DesignWorkspacePage() {
                   }}
                 />
 
-                {/* EXECUTE BUTTON */}
-                <Button
-                  variant="contained"
-                  onClick={handleExecute}
-                  disabled={isGenerating}
-                  sx={{
-                    bgcolor: ui.primary,
-                    color: "#fff",
-                    borderRadius: 3,
-                    px: 2.2,
-                    minHeight: 44,
-                    textTransform: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    "&:hover": { bgcolor: ui.primary },
-                  }}
+                {/* THINKING TOGGLE + EXECUTE BUTTON */}
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap={1.5}
                 >
-                  EXECUTE <ChevronRight fontSize="small" />
-                </Button>
+                  <Tooltip
+                    title="Let the AI reason before generating — higher quality, slower"
+                    arrow
+                  >
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          size="small"
+                          checked={thinkingEnabled}
+                          onChange={(e) => setThinkingEnabled(e.target.checked)}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <AutoAwesome sx={{ fontSize: 14, color: ui.muted }} />
+                          <Typography fontSize={12} color={ui.muted}>
+                            Thinking
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ ml: 0, mr: 0 }}
+                    />
+                  </Tooltip>
+
+                  <Button
+                    variant="contained"
+                    onClick={handleExecute}
+                    disabled={isGenerating || uploadingCount > 0}
+                    sx={{
+                      bgcolor: ui.primary,
+                      color: "#fff",
+                      borderRadius: 3,
+                      px: 2.2,
+                      minHeight: 44,
+                      flex: 1,
+                      maxWidth: 220,
+                      textTransform: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      "&:hover": { bgcolor: ui.primary },
+                    }}
+                  >
+                    EXECUTE <ChevronRight fontSize="small" />
+                  </Button>
+                </Box>
               </Box>
             </Paper>
           </Box>
