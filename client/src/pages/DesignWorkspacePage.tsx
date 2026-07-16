@@ -572,10 +572,16 @@ export default function DesignWorkspacePage() {
         text:
           msg.role === "assistant" ? msg.description || "" : msg.content || "",
 
-        images:
-          msg.images?.length > 0
+        // Base images plus the style references stored with the turn, so a
+        // reloaded user message shows the same images it did when first sent.
+        images: [
+          ...(msg.images?.length
             ? msg.images.map((img: any) => ({ url: img.url }))
-            : [],
+            : []),
+          ...(msg.reference_images?.length
+            ? msg.reference_images.map((url: string) => ({ url }))
+            : []),
+        ],
       }),
     );
   }, []);
