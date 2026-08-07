@@ -71,6 +71,49 @@ const getRoomName = (categoryName: string) => {
   return toTitleCase(room);
 };
 
+/** Rooms in display order (alphabetical, "Unknown" last) plus every MLS image
+ *  flattened into that same order — the baseline carousel shows them all at
+ *  once, so each image carries the room it came from. */
+const buildRoomData = (categoriesObj: Record<string, any>) => {
+  const spaceMap = new Map<string, string>(); // key = lowercase, value = Title Case
+
+  Object.entries(categoriesObj).forEach(([cat, data]: any) => {
+    if ((data?.images || []).length === 0) return;
+
+    const title = getRoomName(cat);
+    const normalized = title.toLowerCase();
+
+    if (!spaceMap.has(normalized)) {
+      spaceMap.set(normalized, title);
+    }
+  });
+
+  const rooms = Array.from(spaceMap.values()).sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+  const unknownIndex = rooms.findIndex((s) => s.toLowerCase() === "unknown");
+
+  if (unknownIndex !== -1) {
+    const [unknown] = rooms.splice(unknownIndex, 1);
+    rooms.push(unknown);
+  }
+
+  const grouped: Record<string, any[]> = {};
+
+  Object.entries(categoriesObj).forEach(([categoryName, data]: any) => {
+    const room = getRoomName(categoryName);
+
+    if (!grouped[room]) grouped[room] = [];
+
+    (data?.images || []).forEach((img: any) => {
+      grouped[room].push({ ...img, room });
+    });
+  });
+
+  return { rooms, images: rooms.flatMap((room) => grouped[room] || []) };
+};
+
 export default function DesignWorkspacePage() {
   const { showSnackbar } = useAppSnackbar();
   const { userId } = useAuth();
@@ -324,20 +367,43 @@ export default function DesignWorkspacePage() {
     [],
   );
 
+  /* The carousel spans every room, so the active space follows whichever
+     image is on screen — that's what titles the panel and tags generations. */
+  const goToIndex = useCallback(
+    (nextIndex: number) => {
+      setCurrentIndex(nextIndex);
+
+      const room = spaceImages[nextIndex]?.room;
+      if (room) setActiveSpace(room);
+    },
+    [spaceImages],
+  );
+
   const handleNext = useCallback(
     (e: any) => {
       e.stopPropagation();
-      setCurrentIndex((prev) => (prev < spaceImages?.length - 1 ? prev + 1 : 0));
+      goToIndex(currentIndex < spaceImages?.length - 1 ? currentIndex + 1 : 0);
     },
-    [spaceImages?.length],
+    [currentIndex, spaceImages?.length, goToIndex],
   );
 
   const handlePrev = useCallback(
     (e: any) => {
       e.stopPropagation();
-      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : spaceImages?.length - 1));
+      goToIndex(currentIndex > 0 ? currentIndex - 1 : spaceImages?.length - 1);
     },
-    [spaceImages?.length],
+    [currentIndex, spaceImages?.length, goToIndex],
+  );
+
+  // Picking a room from the dropdown jumps the carousel to its first image
+  const handleSpaceChange = useCallback(
+    (room: string) => {
+      setActiveSpace(room);
+
+      const index = spaceImages.findIndex((img) => img?.room === room);
+      if (index !== -1) setCurrentIndex(index);
+    },
+    [spaceImages],
   );
 
   const handleExecute = useCallback(async () => {
@@ -593,60 +659,18 @@ export default function DesignWorkspacePage() {
         (cat: any) => cat?.images || [],
       );
 
-      const spaceMap = new Map<string, string>(); // key = lowercase, value = Title Case
-
-      Object.entries(categoriesObj).forEach(([cat, data]: any) => {
-        const hasImages = (data?.images || []).length > 0;
-
-        if (!hasImages) return;
-
-        const title = getRoomName(cat);
-        const normalized = title.toLowerCase();
-
-        if (!spaceMap.has(normalized)) {
-          spaceMap.set(normalized, title);
-        }
-      });
-
-      let extractedSpaces = Array.from(spaceMap.values());
-
-      extractedSpaces.sort((a, b) => a.localeCompare(b));
-
-      const unknownIndex = extractedSpaces.findIndex(
-        (s) => s.toLowerCase() === "unknown",
-      );
-
-      if (unknownIndex !== -1) {
-        const [unknown] = extractedSpaces.splice(unknownIndex, 1);
-        extractedSpaces.push(unknown);
-      }
+      // ---------- ROOMS + EVERY IMAGE, UNFILTERED ----------
+      const { rooms, images: allRoomImages } = buildRoomData(categoriesObj);
 
       const finalSpaces =
-        extractedSpaces?.length > 0
-          ? extractedSpaces
-          : ["Kitchen", "Living Room"];
+        rooms?.length > 0 ? rooms : ["Kitchen", "Living Room"];
 
       setSpaces(finalSpaces);
 
-      // ---------- GROUP IMAGES BY ROOM (INCLUDING UNKNOWN) ----------
-      const groupedImages: Record<string, any[]> = {};
+      // The carousel holds every category's images, not just one room's
+      setSpaceImages(allRoomImages?.length > 0 ? allRoomImages : mlsImages);
 
-      Object.entries(categoriesObj).forEach(([categoryName, data]: any) => {
-        const room = getRoomName(categoryName);
-
-        if (!groupedImages[room]) groupedImages[room] = [];
-
-        (data?.images || []).forEach((img: any) => {
-          groupedImages[room].push(img);
-        });
-      });
-
-      // ---------- SET DEFAULT IMAGES ----------
-      const firstSpace = finalSpaces[0];
-
-      setSpaceImages(groupedImages[firstSpace] || mlsImages);
-
-      setActiveSpace(firstSpace);
+      setActiveSpace(allRoomImages[0]?.room || finalSpaces[0]);
 
       const apiIterations = details?.iteration_history || [];
 
@@ -735,10 +759,6 @@ export default function DesignWorkspacePage() {
   }, [messages, pendingImage, isGenerating, scrollToBottom]);
 
   useEffect(() => {
-    setCurrentIndex(0);
-  }, [activeSpace]);
-
-  useEffect(() => {
     if (!propertyId || !userId) {
       return;
     }
@@ -758,21 +778,15 @@ export default function DesignWorkspacePage() {
 
     const categoriesObj = propertyDetails?.files?.mls_images?.categories || {};
 
-    const groupedImages: Record<string, any[]> = {};
+    setSpaceImages(buildRoomData(categoriesObj).images);
+  }, [propertyDetails]);
 
-    Object.entries(categoriesObj).forEach(([categoryName, data]: any) => {
-      const room = getRoomName(categoryName);
-
-      if (!groupedImages[room]) groupedImages[room] = [];
-
-      (data?.images || []).forEach((img: any) => {
-        groupedImages[room].push(img);
-      });
-    });
-
-    setSpaceImages(groupedImages[activeSpace] || []);
-    setCurrentIndex(0);
-  }, [propertyDetails, activeSpace]);
+  // Keep the carousel on a valid slide if images disappear on reload
+  useEffect(() => {
+    setCurrentIndex((prev) =>
+      prev >= spaceImages.length ? Math.max(0, spaceImages.length - 1) : prev,
+    );
+  }, [spaceImages.length]);
 
   return (
     <>
@@ -937,7 +951,7 @@ export default function DesignWorkspacePage() {
                         <Select
                           value={activeSpace}
                           label="Select Space"
-                          onChange={(e) => setActiveSpace(e.target.value)}
+                          onChange={(e) => handleSpaceChange(e.target.value)}
                           sx={{
                             minWidth: { xs: 150, sm: 200 },
                             bgcolor: "white",
@@ -1087,7 +1101,7 @@ export default function DesignWorkspacePage() {
                             color: ui.muted,
                           }}
                         >
-                          No images for {activeSpace}
+                          No images for this property
                         </Box>
                       )}
                     </Card>
